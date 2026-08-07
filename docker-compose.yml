@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zinto_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-zinto}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-zinto_password}
+      POSTGRES_DB: ${DB_NAME:-zinto_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-zinto}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: zinto_backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-zinto}:${DB_PASSWORD:-zinto_password}@postgres:5432/${DB_NAME:-zinto_db}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      NODE_ENV: development
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend/src:/app/src
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: zinto_frontend
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./apps/frontend/src:/app/src
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: zinto_network
