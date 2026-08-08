@@ -1,0 +1,4 @@
+node_modules/
+*.log
+backend/dist/
+frontend/build/

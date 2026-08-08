@@ -1,0 +1,6 @@
+[
+  {
+    "id": "59894858800@s.whatsapp.net",
+    "name": "Maria Jose"
+  }
+]
