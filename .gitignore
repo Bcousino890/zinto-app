@@ -1,0 +1,32 @@
+node_modules/
+.DS_Store
+
+# Runtime data and customer content
+/uploads/
+/public/
+/media/
+/whatsapp-sessions/
+/data/
+/backups/
+/instances/
+
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+/cookies.txt
+*.pem
+*.key
+*.crt
+*.p12
+
+# Archives and temporary build backups
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+dist/**/*.bak-*
+.cursor/*.log
+.cursor/settings.json
+
+# dist/ is intentionally tracked: this repository is a recovered deployment snapshot.

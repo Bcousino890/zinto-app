@@ -1,0 +1,3 @@
+# Preserve recovered production artifacts byte-for-byte.
+dist/** -text -diff
+translations/** -text -diff

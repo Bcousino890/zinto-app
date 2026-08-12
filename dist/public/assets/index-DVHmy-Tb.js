@@ -1,0 +1,1 @@
+import{aR as s,u as a,r as n,j as r,dc as d}from"./index-C7DlMzz7.js";function e(){const{user:e,isLoading:i}=s(),[u,o]=a();return n.useEffect(()=>{i||(e&&e.isSuperAdmin?o("/admin/dashboard"):e&&o("/"))},[e,i,o]),i||!e?r.jsx(d,{}):null}export{e as default};
