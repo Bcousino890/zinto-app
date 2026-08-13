@@ -30,3 +30,4 @@ dist/**/*.bak-*
 .cursor/settings.json
 
 # dist/ is intentionally tracked: this repository is a recovered deployment snapshot.
+/integration-api/dist/
