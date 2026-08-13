@@ -31,6 +31,15 @@ mediante parametros del cliente.
 | `notes:read` | Listar notas de un contacto |
 | `notes:write` | Crear, editar y borrar notas |
 | `tags:write` | Asociar y quitar etiquetas |
+| `pipelines:read` | Leer pipelines y etapas |
+| `pipelines:write` | Crear, editar y borrar pipelines y etapas |
+| `deals:read` | Leer deals |
+| `deals:write` | Crear, editar, borrar y mover deals |
+| `tasks:read` | Leer tareas |
+| `tasks:write` | Crear, editar y borrar tareas |
+| `flows:read` | Leer flows, sesiones, ejecuciones y plantillas |
+| `erp:read` | Leer recursos ERP publicados |
+| `inventory:read` | Leer almacenes y stock junto con `erp:read` |
 | `webhooks:manage` | Registrar, listar y desactivar webhooks |
 | `*` | Acceso completo; reservar para administracion controlada |
 
