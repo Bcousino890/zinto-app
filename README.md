@@ -16,6 +16,19 @@ The VPS and its Docker image do not contain the original `client`, `server`, or 
 
 Only the 79 frontend assets reachable from the production `index.html` and its import graph are tracked. A further 1,321 obsolete hashed assets from earlier deployments were deliberately excluded.
 
+## Technical ownership and reconstruction
+
+The recovered snapshot is operationally self-contained, but it is not the
+original editable source project. The evidence, limitations, offline restore
+test, and reconstruction strategy are documented in:
+
+- [`docs/CURRENT-PRODUCTION-STATE-2026-08-13.md`](docs/CURRENT-PRODUCTION-STATE-2026-08-13.md)
+- [`docs/api/INTEGRATION-API-DESIGN.md`](docs/api/INTEGRATION-API-DESIGN.md)
+
+New maintainable work must live outside `dist/`. The first such component is
+the standalone `integration-api/`, which provides the stable contract used by
+external companies without modifying the recovered production bundle.
+
 ## Local deployment
 
 1. Copy `.env.example` to `.env` and replace every placeholder secret.
