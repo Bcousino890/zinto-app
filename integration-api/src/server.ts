@@ -4,6 +4,7 @@ import { PostgresApiKeyRepository } from "./db/api-keys.js";
 import { PostgresIdempotencyRepository } from "./db/idempotency.js";
 import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
+import { secureLoggerOptions } from "./http/logging.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
@@ -22,10 +23,7 @@ async function start(): Promise<void> {
     coreRepository: new PostgresCoreRepository(pool),
     deliveryClient: new LegacyDeliveryClient(config.LEGACY_API_URL, config.LEGACY_DELIVERY_TIMEOUT_MS),
     idempotencyRepository: new PostgresIdempotencyRepository(pool),
-    logger: {
-      level: config.LOG_LEVEL,
-      redact: ["req.headers.authorization", "req.headers.cookie"]
-    },
+    logger: secureLoggerOptions(config.LOG_LEVEL),
     onClose: async () => {
       stopWebhookWorker();
       await pool.end();

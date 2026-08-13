@@ -97,6 +97,9 @@ async function performDelivery(
         };
       }
       if (error instanceof DeliveryAdapterError) {
+        // Only the status code is logged: `error.response` is the raw legacy
+        // payload, which can carry customer phone numbers or message content.
+        request.log.warn({ statusCode: error.statusCode }, "legacy delivery engine rejected the message");
         return {
           statusCode: 502,
           body: {

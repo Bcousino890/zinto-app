@@ -9,6 +9,7 @@ import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
 import { ApiError, registerErrorHandlers } from "./http/errors.js";
+import { secureLoggerOptions } from "./http/logging.js";
 import type { CoreRepository } from "./resources/core.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
@@ -34,7 +35,7 @@ export interface AppOptions {
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     genReqId: () => `req_${randomUUID()}`,
-    logger: options.logger ?? true,
+    logger: options.logger ?? secureLoggerOptions(),
     trustProxy: options.trustProxy ?? false
   });
   app.decorateRequest("apiPrincipal", null);

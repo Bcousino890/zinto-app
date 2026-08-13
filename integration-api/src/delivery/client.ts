@@ -57,8 +57,23 @@ interface LegacyResponse {
 }
 
 export class DeliveryAdapterError extends Error {
-  constructor(public readonly statusCode: number, public readonly response: unknown) {
+  readonly #response: unknown;
+
+  constructor(public readonly statusCode: number, response: unknown) {
     super("The legacy delivery engine rejected the message");
+    this.name = "DeliveryAdapterError";
+    this.#response = response;
+  }
+
+  /**
+   * The raw legacy payload can carry customer data (phone numbers, message
+   * content). It is kept behind an accessor rather than a plain enumerable
+   * field so a generic `for...in` copy - which is exactly what pino's default
+   * `err` serializer does when this error reaches a log call - cannot pull it
+   * in. Callers that legitimately need it still can, explicitly.
+   */
+  get response(): unknown {
+    return this.#response;
   }
 }
 
