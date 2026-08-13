@@ -117,8 +117,9 @@ Nada nuevo respecto a lo ya documentado — esta sección solo consolida en un
 solo lugar lo que sigue abierto, con su documento de origen:
 
 1. Aplicar la regla de Nginx que falta (`internal/` deny) — confirmada
-   ausente en el punto 2.2 de este documento, procedimiento en
-   `MEDIA-PROXY-2026-08-13.md` punto 2.
+   ausente en el punto 2.2 de este documento. Referencia única y definitiva
+   del hallazgo y la corrección exacta:
+   `FINDING-NGINX-INTERNAL-PREFIX-2026-08-13.md`.
 2. Volumen escribible para `MEDIA_STORAGE_DIR` — `MEDIA-PROXY-2026-08-13.md`
    punto 1.
 3. Confirmar alcance de red del motor legacy al host interno —

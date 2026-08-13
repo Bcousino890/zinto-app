@@ -9,6 +9,20 @@ hasta `dd74900` (HEAD actual).
 sigue en `3417c32`. HEAD local está **53 commits por delante** de `origin`.
 El propietario hace el único push desde su Mac cuando decida.
 
+## Documentos de cierre (añadidos después de este relevo, mismo día)
+
+Cuatro documentos nuevos, cada uno la referencia única y definitiva de su
+tema — no repiten detalle que ya vivía en otro documento, enlazan hacia él:
+
+- `docs/api/FINDING-NGINX-INTERNAL-PREFIX-2026-08-13.md` — el hallazgo de la
+  regla de Nginx sin aplicar, con el cambio mínimo exacto y su verificación.
+- `docs/api/BUGFIXES-VERIFIED-2026-08-13.md` — los dos bugs reales de este
+  bloque, cómo se encontraron y cómo se validó cada corrección.
+- `docs/api/ACTIVATION-READINESS-2026-08-13.md` — matriz de qué está listo
+  para activar y qué sigue bloqueado, y por qué tipo de bloqueo exactamente.
+- `docs/api/E2E-READINESS-2026-08-13.md` — el formato exacto de datos que
+  necesito para el E2E, y qué falta además de esos datos.
+
 ---
 
 ## Resumen ejecutivo

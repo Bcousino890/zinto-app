@@ -103,10 +103,11 @@ Esto está implementado y probado, pero **no basta con poner la variable a true*
    retención.
 2. **Aplicar la regla de Nginx.** El snippet
    `deploy/nginx-integration-api-preview.conf` ya deniega
-   `/_integration-api/internal/`, pero **todavía no está aplicado en el vhost**.
-   Aplicarlo con `/www/server/nginx/sbin/nginx -t -c /www/server/nginx/conf/nginx.conf`
-   y `kill -HUP $(pgrep -o nginx)`. Verificar después que
-   `https://crm.zinto.app/_integration-api/internal/media/<id>` devuelve 403.
+   `/_integration-api/internal/`, pero **todavía no está aplicado en el vhost**
+   — confirmado por lectura directa del archivo real, no solo por esta nota.
+   Referencia única y definitiva de este hallazgo, con el cambio mínimo exacto
+   y la verificación paso a paso:
+   `docs/api/FINDING-NGINX-INTERNAL-PREFIX-2026-08-13.md`.
 3. **Confirmar que el motor legacy alcanza `MEDIA_INTERNAL_BASE_URL`** por la red
    Docker compartida, y que acepta una URL de ese host.
 4. **Comprobar los límites reales del proveedor** (WhatsApp) para cada tipo, y
