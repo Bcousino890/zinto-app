@@ -104,13 +104,10 @@ type RetentionScope = "idempotency" | "webhook_deliveries" | "outbox";
  * first means every delivery row is removed by its own explicit
  * status + updated_at rule (and its own configured retention window), and an
  * outbox delete can never cascade away a delivery row before that row
- * qualifies on its own terms. In practice, today, the two sets barely
- * overlap anyway: an outbox row's processed_at is only ever set once no
- * active endpoint wants it (see src/webhooks/deliveries.ts claimBatch), which
- * means such a row never had delivery children in the first place. But
- * that's an implementation detail of the webhook worker, not a contract this
- * module wants to depend on - so the safer ordering is kept regardless of
- * whether the cascade can currently fire.
+ * qualifies on its own terms. This ordering is load-bearing now: claimBatch
+ * also closes outbox rows once all their deliveries reach a terminal state, so
+ * a purgeable outbox row routinely does have delivery children, and the
+ * cascade would fire if the order were reversed.
  */
 export function startRetentionPurge(
   repository: RetentionRepository,

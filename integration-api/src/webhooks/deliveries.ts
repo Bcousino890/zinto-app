@@ -38,6 +38,10 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      // `occurred_at >= endpoints.created_at` is what makes registering a
+      // webhook safe: an endpoint subscribes to what happens next, never to the
+      // backlog. Without it, a partner connecting to a tenant that already has
+      // history would be flooded with every past event on its first tick.
       await client.query(
         `INSERT INTO integration_api_webhook_deliveries (endpoint_id, outbox_id)
          SELECT endpoints.id, outbox.id
@@ -45,10 +49,14 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
            JOIN integration_api_webhook_endpoints endpoints
              ON endpoints.company_id = outbox.company_id
             AND endpoints.active = TRUE
+            AND outbox.occurred_at >= endpoints.created_at
             AND (cardinality(endpoints.event_types) = 0 OR outbox.event_type = ANY(endpoints.event_types))
           WHERE outbox.processed_at IS NULL
          ON CONFLICT (endpoint_id, outbox_id) DO NOTHING`
       );
+      // The same time predicate has to appear here too. Without it, an event
+      // older than every endpoint would look "interesting" to this check, never
+      // get a delivery row, and stay unprocessed forever.
       await client.query(
         `UPDATE integration_api_outbox SET processed_at = NOW()
           WHERE processed_at IS NULL
@@ -56,7 +64,25 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
               SELECT 1 FROM integration_api_webhook_endpoints endpoints
                WHERE endpoints.company_id = integration_api_outbox.company_id
                  AND endpoints.active = TRUE
+                 AND integration_api_outbox.occurred_at >= endpoints.created_at
                  AND (cardinality(endpoints.event_types) = 0 OR integration_api_outbox.event_type = ANY(endpoints.event_types))
+            )`
+      );
+      // Rows that did fan out were never being closed: processed_at was only
+      // ever set for events nobody wanted, so any tenant with an active webhook
+      // accumulated outbox rows that retention could not reach. Close them once
+      // every delivery has reached a terminal state.
+      await client.query(
+        `UPDATE integration_api_outbox SET processed_at = NOW()
+          WHERE processed_at IS NULL
+            AND EXISTS (
+              SELECT 1 FROM integration_api_webhook_deliveries deliveries
+               WHERE deliveries.outbox_id = integration_api_outbox.id
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM integration_api_webhook_deliveries deliveries
+               WHERE deliveries.outbox_id = integration_api_outbox.id
+                 AND deliveries.status NOT IN ('delivered', 'dead')
             )`
       );
       const result = await client.query<DeliveryRow>(
