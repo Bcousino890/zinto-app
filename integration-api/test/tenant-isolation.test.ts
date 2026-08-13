@@ -21,8 +21,8 @@ import type {
   ContactResource,
   ConversationResource,
   CoreRepository,
+  IncrementalQuery,
   MessageResource,
-  PageQuery,
   ResourcePage
 } from "../src/resources/core.js";
 import type {
@@ -195,6 +195,24 @@ const foreignChannel: ChannelResource = {
   status: "connected", capabilities: ["text", "media"]
 };
 
+const foreignMessage: MessageResource & { companyId: number } = {
+  companyId: OWNER,
+  id: "800",
+  conversation_id: "700",
+  external_id: null,
+  direction: "incoming",
+  type: "text",
+  content: "Mensaje privado de otra empresa",
+  status: "received",
+  sender_id: null,
+  sender_type: "contact",
+  from_bot: false,
+  media_url: null,
+  sent_at: "2026-08-01T10:00:00.000Z",
+  read_at: null,
+  created_at: "2026-08-01T10:00:00.000Z"
+};
+
 const empty = <T>(): ResourcePage<T> => ({ items: [], hasMore: false, nextCursor: null });
 
 class MemoryCore implements CoreRepository {
@@ -208,10 +226,17 @@ class MemoryCore implements CoreRepository {
   async listConversations(companyId: number): Promise<ResourcePage<ConversationResource>> {
     return companyId === OWNER ? empty<ConversationResource>() : empty<ConversationResource>();
   }
-  async listMessages(companyId: number, conversationId: number, _query: PageQuery) {
+  async listMessages(companyId: number, conversationId: number, _query: IncrementalQuery) {
     // Conversation 700 exists, but only for company 77.
     if (conversationId !== 700 || companyId !== OWNER) return null;
     return empty<MessageResource>();
+  }
+  async findMessage(companyId: number, messageId: number): Promise<MessageResource | null> {
+    // Message 800 exists, but only for company 77: a caller from another
+    // company must get 404 without learning that message 800 exists at all.
+    if (messageId !== 800 || companyId !== OWNER) return null;
+    const { companyId: _owner, ...resource } = foreignMessage;
+    return resource;
   }
 }
 
@@ -296,6 +321,7 @@ const probes: Probe[] = [
   { method: "PUT", url: "/api/v1/contacts/500/tags/vip", expected: 404, code: "contact_not_found" },
   { method: "DELETE", url: "/api/v1/contacts/500/tags/vip", expected: 404, code: "contact_not_found" },
   { method: "GET", url: "/api/v1/conversations/700/messages", expected: 404, code: "conversation_not_found" },
+  { method: "GET", url: "/api/v1/messages/800", expected: 404, code: "message_not_found" },
   { method: "DELETE", url: "/api/v1/webhooks/12", expected: 404, code: "webhook_not_found" }
 ];
 

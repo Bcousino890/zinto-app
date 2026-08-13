@@ -93,6 +93,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Contact page
@@ -401,6 +402,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Conversation page
@@ -449,9 +451,16 @@ paths:
       tags: [Conversations]
       operationId: listConversationMessages
       summary: Read complete message history across all dates
+      description: >
+        updated_since is answered against each message's created_at: the
+        underlying table has no separate updated_at column, so this only
+        catches newly created messages, never a later status or read_at
+        change on an older one (those already arrive as their own
+        message.status.updated webhook event).
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Historical message page, newest first
@@ -465,6 +474,26 @@ paths:
                       data:
                         type: array
                         items: { $ref: "#/components/schemas/Message" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/messages/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Messages]
+      operationId: getMessage
+      summary: Fetch a single message owned by the company
+      responses:
+        "200":
+          description: Message
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: "#/components/schemas/Message" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/messages/send:
     post:

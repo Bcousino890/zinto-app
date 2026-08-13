@@ -7,6 +7,17 @@ export interface PageQuery {
   limit: number;
 }
 
+/**
+ * `updatedSince` viaja junto al cursor pero es un filtro independiente: el
+ * cursor sigue ordenando/paginando por `created_at`, `updated_since` solo
+ * decide que filas entran. Mismo contrato que `IncrementalQuery` en
+ * `resources/pipelines.ts`, definido aqui por separado para no forzar un
+ * import cruzado entre ambos modulos de recursos.
+ */
+export interface IncrementalQuery extends PageQuery {
+  updatedSince: string | null;
+}
+
 export interface ResourcePage<T> {
   items: T[];
   hasMore: boolean;
@@ -71,13 +82,27 @@ export interface MessageResource {
 
 export interface CoreRepository {
   listChannels(companyId: number): Promise<ChannelResource[]>;
-  listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>>;
-  listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>>;
+  listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>>;
+  listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>>;
+  /**
+   * `query.updatedSince` on messages is answered against `created_at`, not a
+   * real `updated_at`: the real `messages` table (verified read-only against
+   * a restored production backup, see
+   * docs/api/SCHEMA-VERIFICATION-2026-08-13-02.md) has no `updated_at`
+   * column at all, only `created_at`. So this filter only ever catches
+   * newly-created messages, never a later change to `status`/`read_at` on an
+   * older one - those are already surfaced separately as their own
+   * `message.status.updated` outbox event (see
+   * migrations/001_integration_api.sql). Using `messages.updated_at` here
+   * would fail in production with "column does not exist" the first time a
+   * partner passed `updated_since` on this endpoint.
+   */
   listMessages(
     companyId: number,
     conversationId: number,
-    query: PageQuery
+    query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null>;
+  findMessage(companyId: number, messageId: number): Promise<MessageResource | null>;
 }
 
 export type Timestamp = Date | string | null;
@@ -179,6 +204,43 @@ interface MessageRow {
   created_at: Timestamp;
 }
 
+const MESSAGE_COLUMNS = `messages.id, messages.conversation_id, messages.external_id, messages.direction,
+              messages.type, messages.content, messages.status, messages.sender_id,
+              messages.sender_type, messages.is_from_bot, messages.media_url, messages.sent_at,
+              messages.read_at, messages.created_at`;
+
+/**
+ * Un mensaje solo pertenece a una empresa a traves de su conversacion: no hay
+ * `company_id` propio en `messages`, igual que `findDeal` en pipelines.ts
+ * depende del join para acotar tenant.
+ */
+const MESSAGE_SOURCE = `messages
+         JOIN conversations ON conversations.id = messages.conversation_id`;
+
+/**
+ * Unico punto de mapeo de una fila de `messages` al recurso publico: lo
+ * comparten el listado paginado y la lectura individual para no duplicar el
+ * shape en dos sitios.
+ */
+function messageResource(row: MessageRow): MessageResource {
+  return {
+    id: String(row.id),
+    conversation_id: String(row.conversation_id),
+    external_id: row.external_id,
+    direction: row.direction,
+    type: row.type ?? "text",
+    content: row.content,
+    status: row.status ?? "sent",
+    sender_id: row.sender_id === null ? null : String(row.sender_id),
+    sender_type: row.sender_type,
+    from_bot: row.is_from_bot ?? false,
+    media_url: row.media_url,
+    sent_at: iso(row.sent_at),
+    read_at: iso(row.read_at),
+    created_at: iso(row.created_at)!
+  };
+}
+
 export class PostgresCoreRepository implements CoreRepository {
   constructor(private readonly pool: pg.Pool) {}
 
@@ -199,7 +261,7 @@ export class PostgresCoreRepository implements CoreRepository {
     }));
   }
 
-  async listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>> {
+  async listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>> {
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<ContactRow>(
       `SELECT id, name, email, phone, avatar_url, company, tags, source, notes,
@@ -207,10 +269,11 @@ export class PostgresCoreRepository implements CoreRepository {
          FROM contacts
         WHERE company_id = $1
           AND deleted_at IS NULL
-          AND ($2::timestamp IS NULL OR (created_at, id) < ($2::timestamp, $3::integer))
+          AND ($2::timestamp IS NULL OR updated_at >= $2::timestamp)
+          AND ($3::timestamp IS NULL OR (created_at, id) < ($3::timestamp, $4::integer))
         ORDER BY created_at DESC, id DESC
-        LIMIT $4`,
-      [companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $5`,
+      [companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
     return paged(result.rows.map((row) => ({
       id: String(row.id),
@@ -229,17 +292,18 @@ export class PostgresCoreRepository implements CoreRepository {
     })), query.limit);
   }
 
-  async listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>> {
+  async listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>> {
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<ConversationRow>(
       `SELECT id, contact_id, channel_id, channel_type, status, assigned_to_user_id,
               last_message_at, unread_count, bot_disabled, is_archived, created_at, updated_at
          FROM conversations
         WHERE company_id = $1
-          AND ($2::timestamp IS NULL OR (created_at, id) < ($2::timestamp, $3::integer))
+          AND ($2::timestamp IS NULL OR updated_at >= $2::timestamp)
+          AND ($3::timestamp IS NULL OR (created_at, id) < ($3::timestamp, $4::integer))
         ORDER BY created_at DESC, id DESC
-        LIMIT $4`,
-      [companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $5`,
+      [companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
     return paged(result.rows.map((row) => ({
       id: String(row.id),
@@ -260,7 +324,7 @@ export class PostgresCoreRepository implements CoreRepository {
   async listMessages(
     companyId: number,
     conversationId: number,
-    query: PageQuery
+    query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null> {
     const conversation = await this.pool.query<{ exists: boolean }>(
       "SELECT EXISTS(SELECT 1 FROM conversations WHERE id = $1 AND company_id = $2) AS exists",
@@ -270,34 +334,28 @@ export class PostgresCoreRepository implements CoreRepository {
 
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<MessageRow>(
-      `SELECT messages.id, messages.conversation_id, messages.external_id, messages.direction,
-              messages.type, messages.content, messages.status, messages.sender_id,
-              messages.sender_type, messages.is_from_bot, messages.media_url, messages.sent_at,
-              messages.read_at, messages.created_at
-         FROM messages
-         JOIN conversations ON conversations.id = messages.conversation_id
+      `SELECT ${MESSAGE_COLUMNS}
+         FROM ${MESSAGE_SOURCE}
         WHERE messages.conversation_id = $1
           AND conversations.company_id = $2
-          AND ($3::timestamp IS NULL OR (messages.created_at, messages.id) < ($3::timestamp, $4::integer))
+          AND ($3::timestamp IS NULL OR messages.created_at >= $3::timestamp)
+          AND ($4::timestamp IS NULL OR (messages.created_at, messages.id) < ($4::timestamp, $5::integer))
         ORDER BY messages.created_at DESC, messages.id DESC
-        LIMIT $5`,
-      [conversationId, companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $6`,
+      [conversationId, companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
-    return paged(result.rows.map((row) => ({
-      id: String(row.id),
-      conversation_id: String(row.conversation_id),
-      external_id: row.external_id,
-      direction: row.direction,
-      type: row.type ?? "text",
-      content: row.content,
-      status: row.status ?? "sent",
-      sender_id: row.sender_id === null ? null : String(row.sender_id),
-      sender_type: row.sender_type,
-      from_bot: row.is_from_bot ?? false,
-      media_url: row.media_url,
-      sent_at: iso(row.sent_at),
-      read_at: iso(row.read_at),
-      created_at: iso(row.created_at)!
-    })), query.limit);
+    return paged(result.rows.map(messageResource), query.limit);
+  }
+
+  async findMessage(companyId: number, messageId: number): Promise<MessageResource | null> {
+    const result = await this.pool.query<MessageRow>(
+      `SELECT ${MESSAGE_COLUMNS}
+         FROM ${MESSAGE_SOURCE}
+        WHERE messages.id = $1
+          AND conversations.company_id = $2`,
+      [messageId, companyId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : messageResource(row);
   }
 }
