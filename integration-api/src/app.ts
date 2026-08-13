@@ -10,6 +10,7 @@ import type { HostResolver } from "./net/destination.js";
 import { registerMediaRoutes } from "./routes/media.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
+import type { ConversationMutationRepository } from "./resources/conversation-mutations.js";
 import type { DeliveryAuditRepository } from "./resources/delivery-audit.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
 import { globalBodyLimitBytes } from "./http/body-limits.js";
@@ -21,6 +22,7 @@ import type { PipelineMutationRepository } from "./resources/pipeline-mutations.
 import type { PipelineRepository } from "./resources/pipelines.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
+import { registerConversationMutationRoutes } from "./routes/conversation-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
 import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
@@ -30,6 +32,7 @@ import { registerWebhookRoutes } from "./routes/webhooks.js";
 export interface AppOptions {
   apiKeyRepository?: ApiKeyRepository;
   contactMutationRepository?: ContactMutationRepository;
+  conversationMutationRepository?: ConversationMutationRepository;
   coreRepository?: CoreRepository;
   deliveryAuditRepository?: DeliveryAuditRepository;
   deliveryClient?: DeliveryClient;
@@ -118,6 +121,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.pipelineMutationRepository,
+        rateLimiter
+      );
+    }
+    if (options.conversationMutationRepository !== undefined) {
+      registerConversationMutationRoutes(
+        app,
+        options.apiKeyRepository,
+        options.conversationMutationRepository,
         rateLimiter
       );
     }

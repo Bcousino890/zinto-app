@@ -74,6 +74,7 @@ describe("OpenAPI partner contract", () => {
       "PATCH /api/v1/notes/{id}",
       "POST /api/v1/contacts",
       "POST /api/v1/contacts/{id}/notes",
+      "POST /api/v1/conversations",
       "POST /api/v1/messages/send",
       "POST /api/v1/messages/send-interactive",
       "POST /api/v1/messages/send-media",
@@ -94,7 +95,8 @@ describe("OpenAPI partner contract", () => {
 
     const stub = new Proxy({}, { get: () => async () => null });
     const app = await buildApp({
-      apiKeyRepository: stub, contactMutationRepository: stub, coreRepository: stub,
+      apiKeyRepository: stub, contactMutationRepository: stub,
+      conversationMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
       mediaStore: stub, pipelineMutationRepository: stub, pipelineRepository: stub,
       webhookRepository: stub

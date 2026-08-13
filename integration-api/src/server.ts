@@ -11,6 +11,7 @@ import { DownloadingMediaProxy } from "./media/proxy.js";
 import { FilesystemMediaStore } from "./media/store.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
+import { PostgresConversationMutationRepository } from "./resources/conversation-mutations.js";
 import { PostgresDeliveryAuditRepository } from "./resources/delivery-audit.js";
 import { PostgresPipelineMutationRepository } from "./resources/pipeline-mutations.js";
 import { PostgresPipelineRepository } from "./resources/pipelines.js";
@@ -35,6 +36,7 @@ async function start(): Promise<void> {
   const app = await buildApp({
     apiKeyRepository: new PostgresApiKeyRepository(pool),
     contactMutationRepository: new PostgresContactMutationRepository(pool),
+    conversationMutationRepository: new PostgresConversationMutationRepository(pool),
     coreRepository: new PostgresCoreRepository(pool),
     deliveryAuditRepository: new PostgresDeliveryAuditRepository(pool),
     deliveryClient: new LegacyDeliveryClient(config.LEGACY_API_URL, config.LEGACY_DELIVERY_TIMEOUT_MS),
