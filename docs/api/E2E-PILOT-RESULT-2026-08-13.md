@@ -6,9 +6,12 @@ runbook previamente presentado y aprobado paso a paso.
 
 **Estado al terminar**: producción sana, `READ_ONLY_MODE=true`,
 `WEBHOOK_WORKER_ENABLED=false`, clave de prueba desactivada, ventana de
-escritura pública nunca abierta. Un punto de la cobertura solicitada
-(recepción de respuesta entrante real) queda pendiente de una acción física
-del propietario — no de nada técnico — ver sección 6.
+escritura pública nunca abierta. **Actualización 14:56 UTC — cobertura
+100 % completa**: el propietario respondió desde ambos números y la
+recepción se verificó con evidencia real (sección 6). Confirmado además que
+la recepción no depende de que la ventana de escritura estuviera abierta —
+llegó ~30 minutos después de cerrarla, procesada por el CRM legacy de forma
+totalmente independiente de `READ_ONLY_MODE`.
 
 ---
 
@@ -61,8 +64,8 @@ UTC, aproximadamente 4-5 minutos.**
 | Selección de canal correcto | **Completo** | `GET /channels` confirmó `channel_id=4` (WhatsApp ESPAÑA) y `channel_id=50` (WhatsApp CHILE), ambos `active` |
 | Creación o reutilización de conversación | **Completo — reutilización real** | `POST /conversations` (contact 7, channel 4) → `200`, `conversation_id=37` (la ya existente, 96 mensajes de historial). Igual para Chile → `200`, `conversation_id=913`. Cero conversaciones duplicadas creadas |
 | Envío desde la integración hacia Zinto | **Completo, ambos números** | España: `201`, `external_id=3EB02B8780010A5C0CFA64`, `status=sent`. Chile: `201`, `external_id=3EB00D8BF2019F2FA33C90`, `status=sent`. Ambos verificados en `messages` (`direction=outbound`, `type=text`) y con su evento `message.created` en el outbox, `company_id=3` |
-| Recepción de respuesta desde el número de prueba | **Pendiente — requiere una acción física tuya, no algo técnico** | Ver sección 6 |
-| Sincronización de mensajes en ambos sentidos | Saliente verificado; entrante pendiente de la respuesta real (ver 6) | — |
+| Recepción de respuesta desde el número de prueba | **Completo** | Confirmado a las 14:56 UTC, ver sección 6 |
+| Sincronización de mensajes en ambos sentidos | **Completo, ambos sentidos verificados** | Saliente + entrante, ver sección 6 |
 | Notas | **Completo** | `POST /contacts/7/notes` → `201`, contenido "Prueba E2E - ignorar (Integration API, 2026-08-13)" |
 | Etiquetas | **Completo** | `PUT /contacts/7/tags/e2e-test-2026-08-13` → `200`, tag visible en el contacto |
 | Conversación | **Completo** | Cubierto arriba (reutilización de 37 y 913) |
@@ -116,23 +119,33 @@ toda la ventana de tiempo de la escritura (14:20–14:25 UTC):
 | Empresas totales | 12, sin cambios |
 | Repo git local | limpio, `docker-compose.preview.yml` idéntico a su estado original (verificado con `diff`) |
 
-## 6. Lo único pendiente: confirmación de recepción real
+## 6. Recepción real confirmada — 14:56 UTC, cobertura 100 % completa
 
-No pude completar "recepción de respuesta desde el número de prueba" porque
-es, literalmente, algo que solo una persona con el teléfono en mano puede
-hacer — no es una limitación técnica ni un paso que quedó sin ejecutar por
-cautela. Los dos mensajes de prueba ya están en los teléfonos autorizados:
+El propietario respondió desde ambos números autorizados. Verificado con
+consulta de solo lectura contra producción, sin reabrir ninguna ventana de
+escritura:
 
-- España (`+34606806103`): "Prueba E2E - ignorar (Integration API,
-  2026-08-13)"
-- Chile (`+56991653343`): el mismo texto
+| | España (conversación `37`) | Chile (conversación `913`) |
+|---|---|---|
+| Mensaje recibido | `id=13916`, contenido "Exitoso 2" | `id=13915`, contenido "Exitoso 1" |
+| `direction` | `inbound` | `inbound` |
+| `status` | `delivered` | `delivered` |
+| `external_id` real de WhatsApp | `2AC08681D8E3F758A244` | `3AB4E31F65CB247EF339` |
+| Recibido a las (UTC) | 14:56:07 | 14:55:57 |
+| Evento outbox | `message.created`, `id=202`, `company_id=3` | `message.created`, `id=196`, `company_id=3` |
+| Conversación actualizada | `unread_count=1`, `last_message_at` correcto | `unread_count=1`, `last_message_at` correcto |
 
-**Para completar la validación bidireccional, necesito que respondas
-cualquier cosa desde esos dos números.** En cuanto lo hagas, lo verifico con
-una simple consulta de lectura — **no hace falta reabrir la ventana de
-escritura para eso**, la recepción de WhatsApp la procesa el CRM legacy
-directamente, siempre activa, independiente de `READ_ONLY_MODE`. Aviso en
-cuanto lo confirme.
+**Confirmación adicional relevante**: la respuesta llegó ~32 minutos después
+de que la ventana de escritura ya estaba cerrada (`READ_ONLY_MODE=true`
+desde las 14:24). Esto confirma empíricamente, no solo en teoría, que la
+recepción de mensajes de WhatsApp la procesa el CRM legacy de forma
+completamente independiente de nuestra Integration API y de
+`READ_ONLY_MODE` — no hizo falta ninguna ventana especial para que la
+sincronización de entrada funcionara.
+
+Con esto, **la cobertura mínima pedida para el E2E queda 100 % completa**,
+salvo el único punto ya documentado como "no aplica" (escritura de tareas,
+sin endpoint implementado).
 
 ## 7. Rollback exacto por cada cambio operativo (todos probados o ya no aplican)
 
@@ -149,14 +162,13 @@ cuanto lo confirme.
 
 ## 8. Riesgos abiertos reales tras este bloque
 
-1. **Recepción entrante real**: pendiente de tu acción (sección 6).
-2. **`sender_id=1`**: los dos mensajes salientes del E2E se guardaron con
+1. **`sender_id=1`**: los dos mensajes salientes del E2E se guardaron con
    `sender_id=1` en el CRM — exactamente el bug ya documentado, no tocado,
    como se instruyó. Nuestra propia auditoría (`actor_user_id=3`) sí quedó
    correcta.
-3. **Limpieza opcional de datos de prueba** (nota, tag) — ver sección 7,
+2. **Limpieza opcional de datos de prueba** (nota, tag) — ver sección 7,
    decisión tuya.
-4. **El resto de las 4 API keys reales de `bcousinoprop`** ("smart bc",
+3. **El resto de las 4 API keys reales de `bcousinoprop`** ("smart bc",
    "Make 1", "CRM PROPIEDADES", y la key `id=1`) tuvieron, durante los ~5
    minutos de ventana, la capacidad técnica de escribir también a través de
    nuestra nueva API si alguien las hubiera apuntado ahí — no hay evidencia
