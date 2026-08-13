@@ -6,6 +6,7 @@ import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
+import { PostgresPipelineRepository } from "./resources/pipelines.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
 import { PostgresWebhookDeliveryRepository } from "./webhooks/deliveries.js";
 import { PostgresWebhookRepository } from "./webhooks/repository.js";
@@ -26,6 +27,7 @@ async function start(): Promise<void> {
       level: config.LOG_LEVEL,
       redact: ["req.headers.authorization", "req.headers.cookie"]
     },
+    pipelineRepository: new PostgresPipelineRepository(pool),
     onClose: async () => {
       stopWebhookWorker();
       await pool.end();

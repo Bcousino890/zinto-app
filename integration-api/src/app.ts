@@ -10,9 +10,11 @@ import type { ContactMutationRepository } from "./resources/contact-mutations.js
 import type { WebhookRepository } from "./webhooks/repository.js";
 import { ApiError, registerErrorHandlers } from "./http/errors.js";
 import type { CoreRepository } from "./resources/core.js";
+import type { PipelineRepository } from "./resources/pipelines.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
+import { registerPipelineRoutes } from "./routes/pipelines.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
@@ -25,6 +27,7 @@ export interface AppOptions {
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
+  pipelineRepository?: PipelineRepository;
   readOnly?: boolean;
   readinessCheck?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
@@ -88,6 +91,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     registerMeRoute(app, options.apiKeyRepository);
     if (options.coreRepository !== undefined) {
       registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository);
+    }
+    if (options.pipelineRepository !== undefined) {
+      registerPipelineRoutes(app, options.apiKeyRepository, options.pipelineRepository);
     }
     if (options.contactMutationRepository !== undefined && options.idempotencyRepository !== undefined) {
       registerContactMutationRoutes(
