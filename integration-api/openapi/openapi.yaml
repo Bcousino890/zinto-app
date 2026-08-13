@@ -510,6 +510,24 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/deals:
+    post:
+      tags: [Deals]
+      operationId: createDeal
+      summary: Create a deal for a company contact
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealCreate" }
+      responses:
+        "201": { description: Deal created }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
     get:
       tags: [Deals]
       operationId: listDeals
@@ -566,6 +584,57 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Deals]
+      operationId: updateDeal
+      summary: Update a deal owned by the company
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealUpdate" }
+      responses:
+        "200": { description: Deal updated }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Deals]
+      operationId: deleteDeal
+      summary: Delete a deal owned by the company
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { description: Deal deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/deals/{id}/move:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    post:
+      tags: [Deals]
+      operationId: moveDeal
+      summary: Move a deal to a stage in another pipeline
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealMove" }
+      responses:
+        "200": { description: Deal moved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/deals/{id}/stage:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1271,6 +1340,45 @@ components:
           type: string
           pattern: '^\d+$'
           description: Stage of the same pipeline the deal already belongs to.
+    DealCreate:
+      type: object
+      required: [contact_id, pipeline_id, stage_id, title]
+      additionalProperties: false
+      properties:
+        contact_id: { type: string, pattern: '^\d+$' }
+        pipeline_id: { type: string, pattern: '^\d+$' }
+        stage_id: { type: string, pattern: '^\d+$' }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        value: { type: [integer, "null"] }
+        priority: { type: [string, "null"], maxLength: 50 }
+        status: { type: [string, "null"], maxLength: 50 }
+        due_date: { type: [string, "null"], format: date-time }
+        assigned_to_user_id: { type: [string, "null"], pattern: '^\d+$' }
+        description: { type: [string, "null"], maxLength: 20000 }
+        tags: { type: array, maxItems: 100, items: { type: string, maxLength: 100 } }
+        custom_fields: { type: object, additionalProperties: true }
+    DealUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        stage_id: { type: string, pattern: '^\d+$' }
+        value: { type: [integer, "null"] }
+        priority: { type: [string, "null"], maxLength: 50 }
+        status: { type: [string, "null"], maxLength: 50 }
+        due_date: { type: [string, "null"], format: date-time }
+        assigned_to_user_id: { type: [string, "null"], pattern: '^\d+$' }
+        description: { type: [string, "null"], maxLength: 20000 }
+        tags: { type: array, maxItems: 100, items: { type: string, maxLength: 100 } }
+        custom_fields: { type: object, additionalProperties: true }
+    DealMove:
+      type: object
+      required: [pipeline_id, stage_id]
+      additionalProperties: false
+      properties:
+        pipeline_id: { type: string, pattern: '^\d+$' }
+        stage_id: { type: string, pattern: '^\d+$' }
     Task:
       type: object
       required: [id, contact_id, title, priority, status, tags, created_at, updated_at]

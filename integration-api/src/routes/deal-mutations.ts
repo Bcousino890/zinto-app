@@ -1,0 +1,25 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
+import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
+import { ApiError } from "../http/errors.js";
+import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { RateLimiter } from "../http/rate-limit.js";
+import type { DealCreateInput, DealMutationFailure, DealMutationRepository, DealUpdateInput } from "../resources/deal-mutations.js";
+
+const idString = z.string().regex(/^\d+$/);
+const body = z.object({ contact_id: idString, pipeline_id: idString, stage_id: idString, title: z.string().trim().min(1).max(255), value: z.number().int().nullable().optional(), priority: z.string().trim().max(50).nullable().optional(), status: z.string().trim().max(50).nullable().optional(), due_date: z.string().datetime().nullable().optional(), assigned_to_user_id: idString.nullable().optional(), description: z.string().max(20000).nullable().optional(), tags: z.array(z.string().trim().min(1).max(100)).max(100).optional(), custom_fields: z.record(z.string(), z.unknown()).optional() }).strict();
+const patch = body.omit({ contact_id: true, pipeline_id: true }).partial().strict().refine((v) => Object.keys(v).length > 0);
+const move = z.object({ pipeline_id: idString, stage_id: idString }).strict();
+function parse<T>(schema: z.ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid"); return result.data; }
+function id(value: string, resource: string): number { const parsed = Number(value); if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed) || parsed < 1) throw new ApiError(400, "validation_error", `The ${resource} ID is invalid`); return parsed; }
+function failure(reason: DealMutationFailure): ApiError { const messages: Record<DealMutationFailure, string> = { contact_not_found: "The contact was not found", pipeline_not_found: "The pipeline was not found", stage_not_found: "The pipeline stage was not found", deal_not_found: "The deal was not found", duplicate_active_deal: "An active deal already exists for this contact in this pipeline" }; return new ApiError(reason === "duplicate_active_deal" ? 409 : 404, reason, messages[reason]); }
+function protect(keys: ApiKeyRepository, limiter: RateLimiter | undefined, policy: WriteAccessPolicy) { const authenticate = createApiKeyAuthenticator(keys, limiter); return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => { await authenticate(request, reply); if (allowsAnyWrite(policy)) assertWriteEnabled(policy, request.apiPrincipal!); assertScopes(request.apiPrincipal!.scopes, ["deals:write"]); }; }
+export function registerDealMutationRoutes(app: FastifyInstance, keys: ApiKeyRepository, repo: DealMutationRepository, idem: IdempotencyRepository, limiter: RateLimiter | undefined, policy: WriteAccessPolicy): void {
+  const preHandler = protect(keys, limiter, policy);
+  app.post("/api/v1/deals", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const input = parse<DealCreateInput>(body, request.body); const result = await repo.createDeal(request.apiPrincipal!.companyId, request.apiPrincipal!.userId, input); if (!result.ok) throw failure(result.reason); return { statusCode: 201, body: { data: result.deal, meta: { request_id: request.id } } }; }));
+  app.patch<{ Params: { id: string } }>("/api/v1/deals/:id", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const result = await repo.updateDeal(request.apiPrincipal!.companyId, id(request.params.id, "deal"), request.apiPrincipal!.userId, parse<DealUpdateInput>(patch, request.body)); if (!result.ok) throw failure(result.reason); return { statusCode: 200, body: { data: result.deal, meta: { request_id: request.id } } }; }));
+  app.delete<{ Params: { id: string } }>("/api/v1/deals/:id", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const result = await repo.deleteDeal(request.apiPrincipal!.companyId, id(request.params.id, "deal"), request.apiPrincipal!.userId); if (!result.ok) throw failure(result.reason); return { statusCode: 200, body: { data: result.deal, meta: { request_id: request.id } } }; }));
+  app.post<{ Params: { id: string } }>("/api/v1/deals/:id/move", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const input = parse(move, request.body); const result = await repo.moveDeal(request.apiPrincipal!.companyId, id(request.params.id, "deal"), request.apiPrincipal!.userId, id(input.pipeline_id, "pipeline"), id(input.stage_id, "stage")); if (!result.ok) throw failure(result.reason); return { statusCode: 200, body: { data: result.deal, meta: { request_id: request.id } } }; }));
+}
