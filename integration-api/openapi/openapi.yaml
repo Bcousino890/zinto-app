@@ -441,6 +441,26 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Message" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/messages/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Messages]
+      operationId: getMessage
+      summary: Fetch a single message owned by the company
+      responses:
+        "200":
+          description: Message
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: "#/components/schemas/Message" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/messages/send:
     post:
       tags: [Messages]

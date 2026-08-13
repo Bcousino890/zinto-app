@@ -34,6 +34,13 @@ function protectedHandler(apiKeys: ApiKeyRepository, scopes: string[], rateLimit
   };
 }
 
+function identifier(value: string, resource: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new ApiError(400, "validation_error", `The ${resource} ID is invalid`);
+  }
+  return Number(value);
+}
+
 /**
  * Mismo patron que `parseListQuery` en routes/pipelines.ts: el unico filtro
  * propio de este bloque (`updated_since`) se separa antes de delegar en
@@ -99,18 +106,30 @@ export function registerCoreRoutes(
     "/api/v1/conversations/:id/messages",
     { preHandler: protectedHandler(apiKeys, ["conversations:read", "messages:read"], rateLimiter) },
     async (request) => {
-      if (!/^\d+$/.test(request.params.id)) {
-        throw new ApiError(400, "validation_error", "The conversation ID is invalid");
-      }
       const page = await resources.listMessages(
         request.apiPrincipal!.companyId,
-        Number(request.params.id),
+        identifier(request.params.id, "conversation"),
         parseIncrementalQuery(request.query)
       );
       if (page === null) {
         throw new ApiError(404, "conversation_not_found", "The conversation was not found");
       }
       return responsePage(request.id, page);
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/v1/messages/:id",
+    { preHandler: protectedHandler(apiKeys, ["messages:read"], rateLimiter) },
+    async (request) => {
+      const data = await resources.findMessage(
+        request.apiPrincipal!.companyId,
+        identifier(request.params.id, "message")
+      );
+      if (data === null) {
+        throw new ApiError(404, "message_not_found", "The message was not found");
+      }
+      return { data, meta: { request_id: request.id } };
     }
   );
 }

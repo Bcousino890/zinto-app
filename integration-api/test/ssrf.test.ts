@@ -316,6 +316,7 @@ class MemoryCore implements CoreRepository {
   async listContacts(): Promise<ResourcePage<never>> { return { items: [], hasMore: false, nextCursor: null }; }
   async listConversations(): Promise<ResourcePage<never>> { return { items: [], hasMore: false, nextCursor: null }; }
   async listMessages() { return null; }
+  async findMessage() { return null; }
 }
 
 class RecordingDelivery implements DeliveryClient {

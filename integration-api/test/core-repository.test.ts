@@ -207,6 +207,43 @@ describe("core read repository", () => {
     });
   });
 
+  it("finds a single message only through its own company's conversation", async () => {
+    const { pool, resources } = repository([{
+      rows: [{
+        id: 701,
+        conversation_id: 501,
+        external_id: "wamid.old",
+        direction: "outgoing",
+        type: "text",
+        content: "Mensaje de hace dos dias",
+        status: "delivered",
+        sender_id: 4,
+        sender_type: "user",
+        is_from_bot: false,
+        media_url: null,
+        sent_at: new Date("2026-08-11T12:00:00.000Z"),
+        read_at: new Date("2026-08-11T12:01:00.000Z"),
+        created_at: new Date("2026-08-11T12:00:00.000Z")
+      }]
+    }]);
+
+    const result = await resources.findMessage(12, 701);
+
+    expect(pool.calls).toHaveLength(1);
+    const sql = flat(pool.calls[0]!.text);
+    expect(sql).toContain("messages.id = $1");
+    expect(sql).toContain("conversations.company_id = $2");
+    expect(pool.calls[0]!.params).toEqual([701, 12]);
+    expect(result?.id).toBe("701");
+  });
+
+  it("returns null for a message outside the company", async () => {
+    const { pool, resources } = repository([{ rows: [] }]);
+
+    expect(await resources.findMessage(12, 999)).toBeNull();
+    expect(pool.calls[0]!.params).toEqual([999, 12]);
+  });
+
   it("reports another page of contacts when the extra row comes back", async () => {
     const rows = Array.from({ length: 3 }, (_value, index) => ({
       id: 100 + index,

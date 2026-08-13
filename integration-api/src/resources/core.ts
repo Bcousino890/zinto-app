@@ -89,6 +89,7 @@ export interface CoreRepository {
     conversationId: number,
     query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null>;
+  findMessage(companyId: number, messageId: number): Promise<MessageResource | null>;
 }
 
 export type Timestamp = Date | string | null;
@@ -190,6 +191,43 @@ interface MessageRow {
   created_at: Timestamp;
 }
 
+const MESSAGE_COLUMNS = `messages.id, messages.conversation_id, messages.external_id, messages.direction,
+              messages.type, messages.content, messages.status, messages.sender_id,
+              messages.sender_type, messages.is_from_bot, messages.media_url, messages.sent_at,
+              messages.read_at, messages.created_at`;
+
+/**
+ * Un mensaje solo pertenece a una empresa a traves de su conversacion: no hay
+ * `company_id` propio en `messages`, igual que `findDeal` en pipelines.ts
+ * depende del join para acotar tenant.
+ */
+const MESSAGE_SOURCE = `messages
+         JOIN conversations ON conversations.id = messages.conversation_id`;
+
+/**
+ * Unico punto de mapeo de una fila de `messages` al recurso publico: lo
+ * comparten el listado paginado y la lectura individual para no duplicar el
+ * shape en dos sitios.
+ */
+function messageResource(row: MessageRow): MessageResource {
+  return {
+    id: String(row.id),
+    conversation_id: String(row.conversation_id),
+    external_id: row.external_id,
+    direction: row.direction,
+    type: row.type ?? "text",
+    content: row.content,
+    status: row.status ?? "sent",
+    sender_id: row.sender_id === null ? null : String(row.sender_id),
+    sender_type: row.sender_type,
+    from_bot: row.is_from_bot ?? false,
+    media_url: row.media_url,
+    sent_at: iso(row.sent_at),
+    read_at: iso(row.read_at),
+    created_at: iso(row.created_at)!
+  };
+}
+
 export class PostgresCoreRepository implements CoreRepository {
   constructor(private readonly pool: pg.Pool) {}
 
@@ -283,12 +321,8 @@ export class PostgresCoreRepository implements CoreRepository {
 
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<MessageRow>(
-      `SELECT messages.id, messages.conversation_id, messages.external_id, messages.direction,
-              messages.type, messages.content, messages.status, messages.sender_id,
-              messages.sender_type, messages.is_from_bot, messages.media_url, messages.sent_at,
-              messages.read_at, messages.created_at
-         FROM messages
-         JOIN conversations ON conversations.id = messages.conversation_id
+      `SELECT ${MESSAGE_COLUMNS}
+         FROM ${MESSAGE_SOURCE}
         WHERE messages.conversation_id = $1
           AND conversations.company_id = $2
           AND ($3::timestamp IS NULL OR messages.updated_at >= $3::timestamp)
@@ -297,21 +331,18 @@ export class PostgresCoreRepository implements CoreRepository {
         LIMIT $6`,
       [conversationId, companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
-    return paged(result.rows.map((row) => ({
-      id: String(row.id),
-      conversation_id: String(row.conversation_id),
-      external_id: row.external_id,
-      direction: row.direction,
-      type: row.type ?? "text",
-      content: row.content,
-      status: row.status ?? "sent",
-      sender_id: row.sender_id === null ? null : String(row.sender_id),
-      sender_type: row.sender_type,
-      from_bot: row.is_from_bot ?? false,
-      media_url: row.media_url,
-      sent_at: iso(row.sent_at),
-      read_at: iso(row.read_at),
-      created_at: iso(row.created_at)!
-    })), query.limit);
+    return paged(result.rows.map(messageResource), query.limit);
+  }
+
+  async findMessage(companyId: number, messageId: number): Promise<MessageResource | null> {
+    const result = await this.pool.query<MessageRow>(
+      `SELECT ${MESSAGE_COLUMNS}
+         FROM ${MESSAGE_SOURCE}
+        WHERE messages.id = $1
+          AND conversations.company_id = $2`,
+      [messageId, companyId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : messageResource(row);
   }
 }

@@ -230,6 +230,13 @@ class MemoryCoreRepository implements CoreRepository {
       ? null
       : page(messages.filter((item) => item.companyId === companyId), query);
   }
+
+  async findMessage(companyId: number, messageId: number): Promise<MessageResource | null> {
+    const message = messages.find((item) => item.companyId === companyId && item.id === String(messageId));
+    if (message === undefined) return null;
+    const { companyId: _companyId, ...resource } = message;
+    return resource;
+  }
 }
 
 afterEach(async () => {
@@ -363,6 +370,34 @@ describe("core resource API", () => {
     expect(messagesResponse.statusCode).toBe(200);
   });
 
+  it("reads a single message by its own id, tenant-scoped", async () => {
+    const app = await makeApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/messages/701",
+      headers: authorization
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual(expect.objectContaining({
+      id: "701",
+      conversation_id: "501",
+      content: "Mensaje de hace dos días"
+    }));
+  });
+
+  it("returns 404 for a message id that does not exist", async () => {
+    const app = await makeApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/messages/999999",
+      headers: authorization
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("message_not_found");
+  });
+
   it.each([
     "/api/v1/contacts?limit=0",
     "/api/v1/contacts?limit=201",
@@ -370,7 +405,8 @@ describe("core resource API", () => {
     "/api/v1/contacts?unknown=true",
     "/api/v1/contacts?updated_since=not-a-date",
     "/api/v1/conversations?updated_since=not-a-date",
-    "/api/v1/conversations/501/messages?updated_since=not-a-date"
+    "/api/v1/conversations/501/messages?updated_since=not-a-date",
+    "/api/v1/messages/not-a-number"
   ])("rejects invalid pagination input: %s", async (url) => {
     const app = await makeApp();
     const response = await app.inject({ method: "GET", url, headers: authorization });
