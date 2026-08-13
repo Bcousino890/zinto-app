@@ -1,11 +1,17 @@
 # Matriz de activación: qué está listo y qué sigue bloqueado
 
-Fecha: 13 de agosto de 2026. Un solo lugar para responder "¿puedo activar
-esto ya?" sobre cada pieza construida hasta ahora. Nada de lo listado aquí
-se ha activado, aplicado ni desplegado — todo sigue exactamente como estaba
-antes de esta sesión en el entorno real (`READ_ONLY_MODE=true`,
-`WEBHOOK_WORKER_ENABLED=false`, sin migraciones nuevas aplicadas, sin
-`send-media` a terceros).
+Fecha original: 13 de agosto de 2026, mañana. Un solo lugar para responder
+"¿puedo activar esto ya?" sobre cada pieza construida hasta ahora.
+
+> **Actualización, misma fecha, tarde**: con autorización explícita del
+> propietario se ejecutó el bloque de cierre del piloto. Estado real ahora:
+> `001_integration_api.sql` y `002_performance_indexes.sql` **ya están
+> aplicadas en producción**; la regla de Nginx de `internal/` **ya está
+> corregida**; `b2883db` **ya está desplegado**. `READ_ONLY_MODE` volvió a
+> `true` y `WEBHOOK_WORKER_ENABLED` sigue en `false` — la tabla de abajo
+> describía el estado de la mañana y ya no es exacta en esas filas. Detalle
+> completo, con evidencia real de cada paso:
+> `docs/api/E2E-PILOT-RESULT-2026-08-13.md`.
 
 **Ninguna fila de esta tabla se activa sin instrucción explícita del
 propietario, uno por uno.** Nada de lo marcado "listo" se hace por

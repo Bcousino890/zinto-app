@@ -1,11 +1,20 @@
 # Hallazgo: la regla de Nginx que debe bloquear `/_integration-api/internal/` no está aplicada
 
+> **RESUELTO, misma fecha, tarde.** Corregido con autorización explícita del
+> propietario: el bloque `location ^~ /_integration-api/internal/ { deny
+> all; }` ya está en el vhost real, verificado en vivo con `curl` (`404` →
+> `403`). Detalle de la ejecución: `docs/api/E2E-PILOT-RESULT-2026-08-13.md`,
+> paso A1. El resto de este documento describe el hallazgo original y la
+> corrección exacta que se aplicó — se deja intacto como referencia de lo que
+> se hizo y por qué.
+
 Fecha del hallazgo: 13 de agosto de 2026. Severidad: **media, sin explotación
-posible hoy** (ver "Por qué no es explotable todavía" abajo). Bloquea
+posible hoy** (ver "Por qué no es explotable todavía" abajo). Bloqueaba
 activar tanto el proxy de media (`MEDIA_PROXY_ENABLED`) como las métricas
-(`METRICS_ENABLED`) hasta corregirse. Este documento es la referencia única
-y definitiva de este hallazgo — los demás documentos que lo mencionan
-(`docs/api/MEDIA-PROXY-2026-08-13.md`, `docs/api/OPERATIONAL-READINESS-2026-08-13.md`,
+(`METRICS_ENABLED`) hasta corregirse — ya corregido. Este documento es la
+referencia única y definitiva de este hallazgo — los demás documentos que lo
+mencionan (`docs/api/MEDIA-PROXY-2026-08-13.md`,
+`docs/api/OPERATIONAL-READINESS-2026-08-13.md`,
 `docs/api/METRICS-2026-08-13.md`) enlazan aquí en vez de repetir el detalle.
 
 ---
