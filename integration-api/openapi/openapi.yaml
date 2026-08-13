@@ -421,6 +421,7 @@ paths:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/messages/send-media:
     post:
@@ -447,6 +448,7 @@ paths:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "502": { $ref: "#/components/responses/DeliveryFailed" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/messages/send-template:
@@ -464,6 +466,7 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/messages/send-interactive:
     post:
@@ -480,6 +483,7 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/webhooks:
     get:
@@ -605,6 +609,16 @@ components:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     DeliveryTimeout:
       description: Delivery may have occurred; retrying automatically is unsafe
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    DeliveryFailed:
+      description: >
+        The legacy delivery engine did not accept the message. `error.code`
+        distinguishes `delivery_rejected` (the engine's own 4xx: the request
+        will not succeed unchanged, do not retry it as-is) from
+        `delivery_failed` (the engine itself is unavailable or answered
+        unexpectedly: safe to retry later with the same idempotency key).
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }

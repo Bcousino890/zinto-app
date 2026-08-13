@@ -23,7 +23,8 @@ categoria y `error.code` permite decisiones automaticas.
 | 404 | `*_not_found` | Verificar ID y empresa |
 | 409 | `idempotency_conflict`, `channel_inactive` | No repetir sin corregir |
 | 422 | `channel_capability_unsupported` | Elegir otro canal o tipo |
-| 502 | `delivery_failed` | Revisar proveedor; reintentar con la misma clave cuando corresponda |
+| 502 | `delivery_rejected` | El motor legacy rechazo la solicitud (su propio 4xx); no reintentar sin cambiarla |
+| 502 | `delivery_failed` | Motor legacy caido o respuesta inesperada; reintentar con la misma clave cuando corresponda |
 | 504 | `delivery_timeout` | Verificar estado antes de reintentar |
 | 500 | `internal_error` | Reintentar con espera y comunicar `request_id` |
 
