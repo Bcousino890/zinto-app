@@ -109,6 +109,7 @@ export class PostgresContactMutationRepository implements ContactMutationReposit
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT set_config('zinto.integration_api_origin', 'api', true)");
       const result = await operation(client);
       await client.query("COMMIT");
       return result;

@@ -6,12 +6,14 @@ import type { ApiKeyRepository } from "./auth/api-key.js";
 import type { DeliveryClient } from "./delivery/client.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
+import type { WebhookRepository } from "./webhooks/repository.js";
 import { registerErrorHandlers } from "./http/errors.js";
 import type { CoreRepository } from "./resources/core.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
+import { registerWebhookRoutes } from "./routes/webhooks.js";
 
 export interface AppOptions {
   apiKeyRepository?: ApiKeyRepository;
@@ -22,6 +24,7 @@ export interface AppOptions {
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
+  webhookRepository?: WebhookRepository;
 }
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
@@ -69,6 +72,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.idempotencyRepository,
         options.deliveryClient
       );
+    }
+    if (options.webhookRepository !== undefined) {
+      registerWebhookRoutes(app, options.apiKeyRepository, options.webhookRepository);
     }
   }
   if (options.onClose !== undefined) {

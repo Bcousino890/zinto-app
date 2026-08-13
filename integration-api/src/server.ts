@@ -6,10 +6,16 @@ import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
+import { WebhookSecretCipher } from "./webhooks/cipher.js";
+import { PostgresWebhookDeliveryRepository } from "./webhooks/deliveries.js";
+import { PostgresWebhookRepository } from "./webhooks/repository.js";
+import { startWebhookWorker } from "./webhooks/worker.js";
 
 async function start(): Promise<void> {
   const config = loadConfig();
   const pool = createDatabasePool(config.DATABASE_URL);
+  const webhookCipher = new WebhookSecretCipher(config.WEBHOOK_ENCRYPTION_KEY);
+  let stopWebhookWorker: () => void = () => undefined;
   const app = await buildApp({
     apiKeyRepository: new PostgresApiKeyRepository(pool),
     contactMutationRepository: new PostgresContactMutationRepository(pool),
@@ -20,9 +26,18 @@ async function start(): Promise<void> {
       level: config.LOG_LEVEL,
       redact: ["req.headers.authorization", "req.headers.cookie"]
     },
-    onClose: async () => pool.end(),
-    trustProxy: config.TRUST_PROXY
+    onClose: async () => {
+      stopWebhookWorker();
+      await pool.end();
+    },
+    trustProxy: config.TRUST_PROXY,
+    webhookRepository: new PostgresWebhookRepository(pool, webhookCipher)
   });
+  stopWebhookWorker = startWebhookWorker(
+    new PostgresWebhookDeliveryRepository(pool, webhookCipher),
+    1000,
+    (error) => app.log.error({ err: error }, "webhook worker iteration failed")
+  );
 
   try {
     await app.listen({ host: config.HOST, port: config.PORT });

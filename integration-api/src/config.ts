@@ -7,7 +7,8 @@ const configSchema = z.object({
   LEGACY_DELIVERY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
   PORT: z.coerce.number().int().min(1).max(65535).default(3100),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
-  TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((value) => value === "true")
+  TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  WEBHOOK_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/)
 });
 
 export type ServiceConfig = z.infer<typeof configSchema>;
