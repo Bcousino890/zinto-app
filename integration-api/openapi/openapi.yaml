@@ -66,6 +66,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/IdentityResponse"
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/channels:
     get:
       tags: [Channels]
@@ -84,6 +85,7 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Channel" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/contacts:
     get:
@@ -108,6 +110,8 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Contact" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Contacts]
       operationId: createContact
@@ -126,6 +130,8 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/contacts/{id}:
     parameters:
@@ -145,6 +151,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Contacts]
@@ -156,6 +165,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/contacts/{id}/notes:
     parameters:
@@ -177,6 +189,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/NoteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/notes/{id}:
     parameters:
@@ -196,6 +211,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/NoteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Contacts]
@@ -203,6 +221,9 @@ paths:
       summary: Delete a note
       responses:
         "204": { description: Note deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/contacts/{id}/tags/{tag}:
     parameters:
@@ -221,6 +242,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Contacts]
@@ -232,6 +256,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/pipelines:
     get:
@@ -256,6 +283,8 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Pipeline" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/pipelines/{id}/stages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -281,6 +310,8 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/PipelineStage" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/deals:
     get:
@@ -315,6 +346,8 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Deal" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/deals/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -334,6 +367,8 @@ paths:
                   data: { $ref: "#/components/schemas/Deal" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/deals/{id}/stage:
     parameters:
@@ -365,6 +400,7 @@ paths:
                   data: { $ref: "#/components/schemas/Deal" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/StagePipelineMismatch" }
@@ -394,6 +430,8 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/Task" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/conversations:
     get:
       tags: [Conversations]
@@ -416,6 +454,9 @@ paths:
                       data:
                         type: array
                         items: { $ref: "#/components/schemas/Conversation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Conversations]
       operationId: createConversation
@@ -443,6 +484,8 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ConversationResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/conversations/{id}/messages:
     parameters:
@@ -474,6 +517,9 @@ paths:
                       data:
                         type: array
                         items: { $ref: "#/components/schemas/Message" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/messages/{id}:
     parameters:
@@ -509,8 +555,12 @@ paths:
             schema: { $ref: "#/components/schemas/TextMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/messages/send-media:
@@ -537,6 +587,10 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -555,6 +609,11 @@ paths:
             schema: { $ref: "#/components/schemas/TemplateMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
@@ -572,6 +631,11 @@ paths:
             schema: { $ref: "#/components/schemas/InteractiveMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
@@ -592,6 +656,8 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/WebhookEndpoint" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Webhooks]
       operationId: createWebhook
@@ -617,6 +683,8 @@ paths:
                           secret: { type: string, pattern: '^whsec_[a-f0-9]{64}$' }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/webhooks/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -626,6 +694,9 @@ paths:
       summary: Disable a webhook endpoint
       responses:
         "204": { description: Endpoint disabled }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 components:
   securitySchemes:
@@ -997,9 +1068,9 @@ components:
       additionalProperties: false
       properties:
         channel_id: { type: string, pattern: '^\d+$' }
-        to: { type: string }
+        to: { type: string, minLength: 1, maxLength: 320 }
         media_type: { type: string, enum: [image, video, audio, document] }
-        media_url: { type: string, format: uri, description: Public HTTP(S) URL; private addresses are rejected }
+        media_url: { type: string, format: uri, maxLength: 2048, description: Public HTTP(S) URL; private addresses are rejected }
         caption: { type: string, maxLength: 1024 }
         filename: { type: string, maxLength: 255 }
     TemplateMessageInput:
@@ -1008,7 +1079,7 @@ components:
       additionalProperties: false
       properties:
         channel_id: { type: string, pattern: '^\d+$' }
-        to: { type: string }
+        to: { type: string, minLength: 1, maxLength: 320 }
         template_name: { type: string }
         template_language: { type: string, default: en }
         components: { type: array, items: {} }
@@ -1018,7 +1089,7 @@ components:
       additionalProperties: false
       properties:
         channel_id: { type: string, pattern: '^\d+$' }
-        to: { type: string }
+        to: { type: string, minLength: 1, maxLength: 320 }
         interactive_type: { type: string, enum: [button, list] }
         body: { type: string, minLength: 1, maxLength: 1024 }
         header: { type: string, maxLength: 60 }
@@ -1047,7 +1118,7 @@ components:
         event_types:
           type: array
           minItems: 1
-          uniqueItems: true
+          maxItems: 20
           items: { $ref: "#/components/schemas/WebhookEventType" }
     WebhookEndpoint:
       type: object
