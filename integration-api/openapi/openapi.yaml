@@ -475,6 +475,7 @@ paths:
       tags: [Tasks]
       operationId: createTask
       summary: Create a task for a company contact
+      description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -498,11 +499,14 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/tasks/{id}:
     patch:
       tags: [Tasks]
       operationId: updateTask
       summary: Update a task
+      description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
       parameters:
         - $ref: "#/components/parameters/ResourceId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -527,10 +531,13 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     delete:
       tags: [Tasks]
       operationId: deleteTask
       summary: Delete a task
+      description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
       parameters:
         - $ref: "#/components/parameters/ResourceId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -540,6 +547,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/conversations:
     get:
       tags: [Conversations]

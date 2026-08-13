@@ -33,7 +33,15 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 
 function id(value: string): number {
   if (!/^\d+$/.test(value)) throw new ApiError(400, "validation_error", "The task ID is invalid");
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new ApiError(400, "validation_error", "The task ID is invalid");
+  return parsed;
+}
+
+function assertSafeId(value: string): void {
+  if (!Number.isSafeInteger(Number(value))) {
+    throw new ApiError(400, "validation_error", "The contact ID is invalid");
+  }
 }
 
 function protect(apiKeys: ApiKeyRepository, rateLimiter: RateLimiter | undefined, policy: WriteAccessPolicy) {
@@ -56,6 +64,7 @@ export function registerTaskMutationRoutes(
   const preHandler = protect(apiKeys, rateLimiter, writeAccessPolicy);
   app.post("/api/v1/tasks", { preHandler }, async (request, reply) => {
     const input = parse<TaskMutationInput>(createSchema, request.body);
+    assertSafeId(input.contact_id);
     return withIdempotency(request, reply, idempotency, async () => {
       const data = await repository.createTask(request.apiPrincipal!.companyId, request.apiPrincipal!.userId, input);
       if (data === null) throw new ApiError(404, "contact_not_found", "The contact was not found");

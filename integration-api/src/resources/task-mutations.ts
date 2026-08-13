@@ -125,6 +125,14 @@ export class PostgresTaskMutationRepository implements TaskMutationRepository {
 
   async updateTask(companyId: number, taskId: number, userId: number, input: TaskMutationPatch): Promise<TaskResource | null> {
     return this.transaction(async (client) => {
+      const normalized = { ...input };
+      if (normalized.status === "completed" && normalized.completed_at === undefined) {
+        normalized.completed_at = new Date().toISOString();
+      } else if (normalized.status !== undefined && normalized.status !== "completed" && normalized.completed_at === undefined) {
+        normalized.completed_at = null;
+      } else if (normalized.completed_at !== undefined && normalized.status === undefined) {
+        normalized.status = normalized.completed_at === null ? "pending" : "completed";
+      }
       const result = await client.query<TaskRow>(
         `UPDATE contact_tasks SET
            title = CASE WHEN $3::boolean THEN $4 ELSE title END,
@@ -141,22 +149,25 @@ export class PostgresTaskMutationRepository implements TaskMutationRepository {
          WHERE id = $1 AND company_id = $2
          RETURNING ${columns}`,
         [taskId, companyId,
-          input.title !== undefined, input.title ?? null,
-          input.description !== undefined, input.description ?? null,
-          input.priority !== undefined, input.priority ?? null,
-          input.status !== undefined, input.status ?? null,
-          input.due_date !== undefined, input.due_date ?? null,
-          input.completed_at !== undefined, input.completed_at ?? null,
-          input.assigned_to !== undefined, input.assigned_to ?? null,
-          input.category !== undefined, input.category ?? null,
-          input.tags !== undefined, input.tags ?? null,
-          input.background_color !== undefined, input.background_color ?? null,
+          normalized.title !== undefined, normalized.title ?? null,
+          normalized.description !== undefined, normalized.description ?? null,
+          normalized.priority !== undefined, normalized.priority ?? null,
+          normalized.status !== undefined, normalized.status ?? null,
+          normalized.due_date !== undefined, normalized.due_date ?? null,
+          normalized.completed_at !== undefined, normalized.completed_at ?? null,
+          normalized.assigned_to !== undefined, normalized.assigned_to ?? null,
+          normalized.category !== undefined, normalized.category ?? null,
+          normalized.tags !== undefined, normalized.tags ?? null,
+          normalized.background_color !== undefined, normalized.background_color ?? null,
           userId]
       );
       const row = result.rows[0];
       if (row === undefined) return null;
       const value = resource(row);
       await this.record(client, companyId, userId, "task.updated", row.id, value);
+      if (value.status === "completed") {
+        await this.record(client, companyId, userId, "task.completed", row.id, value);
+      }
       return value;
     });
   }

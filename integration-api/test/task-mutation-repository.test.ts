@@ -59,7 +59,7 @@ const taskRow = {
   updated_at: new Date("2026-08-13T10:00:00.000Z")
 };
 
-function repository(overrides: Partial<typeof taskRow> = {}) {
+function repository(overrides: { status?: string; completed_at?: Date | null } = {}) {
   const row = { ...taskRow, ...overrides };
   const pool = new FakePool((text) => {
     if (text.includes("INSERT INTO contact_tasks") || text.includes("UPDATE contact_tasks")) {
@@ -96,7 +96,7 @@ describe("task mutation repository", () => {
   });
 
   it("updates only a task owned by the caller company", async () => {
-    const { pool, tasks } = repository();
+    const { pool, tasks } = repository({ status: "completed", completed_at: new Date("2026-08-13T11:00:00.000Z") });
     const result = await tasks.updateTask(12, 501, 7, { status: "completed", completed_at: "2026-08-13T11:00:00.000Z" });
 
     expect(result).toEqual(expect.objectContaining({ id: "501" }));
@@ -105,6 +105,7 @@ describe("task mutation repository", () => {
     expect(update.params[0]).toBe(501);
     expect(update.params[1]).toBe(12);
     expect(eventCall(pool, "task.updated")!.params.slice(0, 4)).toEqual([12, 7, "task.updated", 501]);
+    expect(eventCall(pool, "task.completed")!.params.slice(0, 4)).toEqual([12, 7, "task.completed", 501]);
   });
 
   it("deletes only a task owned by the caller company and emits task.deleted", async () => {

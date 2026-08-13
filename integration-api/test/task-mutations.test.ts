@@ -83,10 +83,34 @@ describe("task mutation routes", () => {
     expect(tasks.calls).toBe(1);
   });
 
+  it("rejects an idempotency key reused with a different body", async () => {
+    const { app, tasks } = await make();
+    const headers = { ...auth, "idempotency-key": "task-conflict" };
+    expect((await app.inject({ method: "POST", url: "/api/v1/tasks", headers, payload: { contact_id: "101", title: "Llamar" } })).statusCode).toBe(201);
+    const response = await app.inject({ method: "POST", url: "/api/v1/tasks", headers, payload: { contact_id: "101", title: "Otro" } });
+    expect(response.statusCode).toBe(409);
+    expect(tasks.calls).toBe(1);
+  });
+
+  it("requires an idempotency key for update and delete", async () => {
+    const { app } = await make();
+    const update = await app.inject({ method: "PATCH", url: "/api/v1/tasks/501", headers: auth, payload: { status: "completed" } });
+    const remove = await app.inject({ method: "DELETE", url: "/api/v1/tasks/501", headers: auth });
+    expect(update.statusCode).toBe(400);
+    expect(remove.statusCode).toBe(400);
+  });
+
   it("returns the same not-found result for a task outside the company", async () => {
     const { app } = await make();
     const response = await app.inject({ method: "PATCH", url: "/api/v1/tasks/999", headers: { ...auth, "idempotency-key": "task-3" }, payload: { status: "completed" } });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe("task_not_found");
+  });
+
+  it("rejects unsafe numeric ids instead of rounding them", async () => {
+    const { app } = await make();
+    const response = await app.inject({ method: "PATCH", url: "/api/v1/tasks/9007199254740992", headers: { ...auth, "idempotency-key": "task-large" }, payload: { status: "completed" } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("validation_error");
   });
 });
