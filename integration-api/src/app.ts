@@ -4,7 +4,10 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 
 import type { ApiKeyRepository } from "./auth/api-key.js";
 import type { DeliveryClient } from "./delivery/client.js";
+import type { MediaProxy } from "./media/proxy.js";
+import type { MediaStore } from "./media/store.js";
 import type { HostResolver } from "./net/destination.js";
+import { registerMediaRoutes } from "./routes/media.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
@@ -24,6 +27,8 @@ export interface AppOptions {
   hostResolver?: HostResolver;
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
+  mediaProxy?: MediaProxy;
+  mediaStore?: MediaStore;
   onClose?: () => Promise<void>;
   readOnly?: boolean;
   readinessCheck?: () => Promise<void>;
@@ -105,7 +110,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.coreRepository,
         options.idempotencyRepository,
         options.deliveryClient,
-        options.hostResolver
+        options.hostResolver,
+        options.mediaProxy
       );
     }
     if (options.webhookRepository !== undefined) {
@@ -116,6 +122,11 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.hostResolver
       );
     }
+  }
+  // Served without an API key because the delivery engine fetches it without the
+  // partner's credentials; the reverse proxy denies the prefix publicly.
+  if (options.mediaStore !== undefined) {
+    registerMediaRoutes(app, options.mediaStore);
   }
   if (options.onClose !== undefined) {
     app.addHook("onClose", options.onClose);

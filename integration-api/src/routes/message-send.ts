@@ -8,6 +8,7 @@ import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { MediaProxy } from "../media/proxy.js";
 import type { HostResolver } from "../net/destination.js";
 import type { ChannelResource, CoreRepository } from "../resources/core.js";
 
@@ -119,7 +120,8 @@ export function registerMessageSendRoutes(
   resources: CoreRepository,
   idempotency: IdempotencyRepository,
   delivery: DeliveryClient,
-  resolveHost?: HostResolver
+  resolveHost?: HostResolver,
+  mediaProxy?: MediaProxy
 ): void {
   const preHandler = protect(apiKeys);
 
@@ -141,13 +143,19 @@ export function registerMessageSendRoutes(
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "media");
     await assertSafeMediaUrl(input.media_url, resolveHost);
+    // Without the proxy the engine resolves the partner URL itself, which is the
+    // rebinding window we cannot close from here; with it, the engine only ever
+    // sees an address we control.
+    const mediaUrl = mediaProxy === undefined
+      ? input.media_url
+      : await mediaProxy.prepare(input.media_url, input.media_type);
     return performDelivery(request, reply, idempotency, delivery, {
       kind: "media",
       bearerToken: bearerToken(request),
       channelId: Number(input.channel_id),
       to: input.to,
       mediaType: input.media_type,
-      mediaUrl: input.media_url,
+      mediaUrl,
       caption: input.caption,
       filename: input.filename
     });

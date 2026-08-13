@@ -4,6 +4,8 @@ import { PostgresApiKeyRepository } from "./db/api-keys.js";
 import { PostgresIdempotencyRepository } from "./db/idempotency.js";
 import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
+import { DownloadingMediaProxy } from "./media/proxy.js";
+import { FilesystemMediaStore } from "./media/store.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
@@ -16,6 +18,13 @@ async function start(): Promise<void> {
   const pool = createDatabasePool(config.DATABASE_URL);
   const webhookCipher = new WebhookSecretCipher(config.WEBHOOK_ENCRYPTION_KEY);
   let stopWebhookWorker: () => void = () => undefined;
+  const mediaStore = config.MEDIA_PROXY_ENABLED
+    ? new FilesystemMediaStore(config.MEDIA_STORAGE_DIR, config.MEDIA_INTERNAL_BASE_URL!)
+    : undefined;
+  const mediaPurge = mediaStore === undefined ? undefined : setInterval(() => {
+    void mediaStore.purge(new Date(Date.now() - config.MEDIA_RETENTION_MINUTES * 60_000));
+  }, 60_000);
+  mediaPurge?.unref();
   const app = await buildApp({
     apiKeyRepository: new PostgresApiKeyRepository(pool),
     contactMutationRepository: new PostgresContactMutationRepository(pool),
@@ -26,8 +35,14 @@ async function start(): Promise<void> {
       level: config.LOG_LEVEL,
       redact: ["req.headers.authorization", "req.headers.cookie"]
     },
+    mediaProxy: mediaStore === undefined ? undefined : new DownloadingMediaProxy(mediaStore, {
+      maxBytes: config.MEDIA_MAX_BYTES,
+      timeoutMs: config.LEGACY_DELIVERY_TIMEOUT_MS
+    }),
+    mediaStore,
     onClose: async () => {
       stopWebhookWorker();
+      if (mediaPurge !== undefined) clearInterval(mediaPurge);
       await pool.end();
     },
     readOnly: config.READ_ONLY_MODE,

@@ -44,4 +44,10 @@ describe("preview deployment artifacts", () => {
     expect(nginx).toContain("limit_except GET HEAD OPTIONS");
     expect(nginx).toContain("proxy_pass http://127.0.0.1:3100/");
   });
+
+  it("denies the internal media prefix publicly", async () => {
+    const nginx = await read("deploy/nginx-integration-api-preview.conf");
+
+    expect(nginx).toMatch(/location \^~ \/_integration-api\/internal\/ \{\s*deny all;/);
+  });
 });

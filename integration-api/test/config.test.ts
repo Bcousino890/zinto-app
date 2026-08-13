@@ -26,4 +26,17 @@ describe("safe deployment configuration", () => {
     expect(config.READ_ONLY_MODE).toBe(false);
     expect(config.WEBHOOK_WORKER_ENABLED).toBe(true);
   });
+
+  it("keeps the media proxy disabled unless it is switched on explicitly", () => {
+    expect(loadConfig(required).MEDIA_PROXY_ENABLED).toBe(false);
+  });
+
+  it("refuses to enable the media proxy without the address the engine must call", () => {
+    expect(() => loadConfig({ ...required, MEDIA_PROXY_ENABLED: "true" })).toThrow();
+    expect(loadConfig({
+      ...required,
+      MEDIA_PROXY_ENABLED: "true",
+      MEDIA_INTERNAL_BASE_URL: "http://zinto-integration-api:3100"
+    }).MEDIA_PROXY_ENABLED).toBe(true);
+  });
 });
