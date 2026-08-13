@@ -25,6 +25,7 @@ import type { PipelineMutationRepository } from "./resources/pipeline-mutations.
 import type { PipelineCrudRepository } from "./resources/pipeline-crud.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
 import type { FlowReadRepository } from "./resources/flow-reads.js";
+import type { ErpReadRepository } from "./resources/erp-read.js";
 import type { DealMutationRepository } from "./resources/deal-mutations.js";
 import type { TaskMutationRepository } from "./resources/task-mutations.js";
 import { registerCoreRoutes } from "./routes/core.js";
@@ -35,6 +36,7 @@ import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
 import { registerPipelineCrudRoutes } from "./routes/pipeline-crud.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
 import { registerFlowReadRoutes } from "./routes/flow-reads.js";
+import { registerErpReadRoutes } from "./routes/erp-read.js";
 import { registerDealMutationRoutes } from "./routes/deal-mutations.js";
 import { registerTaskMutationRoutes } from "./routes/task-mutations.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
@@ -59,6 +61,7 @@ export interface AppOptions {
   pipelineCrudRepository?: PipelineCrudRepository;
   pipelineRepository?: PipelineRepository;
   flowReadRepository?: FlowReadRepository;
+  erpReadRepository?: ErpReadRepository;
   dealMutationRepository?: DealMutationRepository;
   taskMutationRepository?: TaskMutationRepository;
   rateLimiter?: RateLimiter;
@@ -166,6 +169,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
     if (options.flowReadRepository !== undefined) {
       registerFlowReadRoutes(app, options.apiKeyRepository, options.flowReadRepository);
+    }
+    if (options.erpReadRepository !== undefined) {
+      registerErpReadRoutes(app, options.apiKeyRepository, options.erpReadRepository, rateLimiter);
     }
     if (options.pipelineMutationRepository !== undefined) {
       registerPipelineMutationRoutes(

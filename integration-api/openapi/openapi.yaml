@@ -19,6 +19,7 @@ tags:
   - name: Messages
   - name: Webhooks
   - name: Flows
+  - name: ERP
 security:
   - bearerAuth: []
 paths:
@@ -88,6 +89,55 @@ paths:
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/products:
+    get:
+      tags: [ERP]
+      operationId: listErpProducts
+      summary: List company products
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated products }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/inventory/warehouses:
+    get:
+      tags: [ERP]
+      operationId: listErpWarehouses
+      summary: List company warehouses
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated warehouses }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/inventory/stock-levels:
+    get:
+      tags: [ERP]
+      operationId: listErpStockLevels
+      summary: List company stock levels
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated stock levels }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/suppliers:
+    get:
+      tags: [ERP]
+      operationId: listErpSuppliers
+      summary: List company suppliers
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated suppliers }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/sales-orders:
+    get:
+      tags: [ERP]
+      operationId: listErpSalesOrders
+      summary: List company sales orders
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated sales orders }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/purchase-orders:
+    get:
+      tags: [ERP]
+      operationId: listErpPurchaseOrders
+      summary: List company purchase orders
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated purchase orders }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
+  /api/v1/erp/invoices:
+    get:
+      tags: [ERP]
+      operationId: listErpInvoices
+      summary: List company invoices
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses: { "200": { description: Paginated invoices }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
   /api/v1/flows:
     get:
       tags: [Flows]

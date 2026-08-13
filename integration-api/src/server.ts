@@ -18,6 +18,7 @@ import { PostgresPipelineMutationRepository } from "./resources/pipeline-mutatio
 import { PostgresPipelineCrudRepository } from "./resources/pipeline-crud.js";
 import { PostgresPipelineRepository } from "./resources/pipelines.js";
 import { PostgresFlowReadRepository } from "./resources/flow-reads.js";
+import { PostgresErpReadRepository } from "./resources/erp-read.js";
 import { PostgresTaskMutationRepository } from "./resources/task-mutations.js";
 import { PostgresDealMutationRepository } from "./resources/deal-mutations.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
@@ -67,6 +68,7 @@ async function start(): Promise<void> {
     pipelineCrudRepository: new PostgresPipelineCrudRepository(pool),
     pipelineRepository: new PostgresPipelineRepository(pool),
     flowReadRepository: new PostgresFlowReadRepository(pool),
+    erpReadRepository: new PostgresErpReadRepository(pool),
     dealMutationRepository: new PostgresDealMutationRepository(pool),
     taskMutationRepository: new PostgresTaskMutationRepository(pool),
     onClose: async () => {
