@@ -77,12 +77,31 @@ function allZero(bytes: Uint8Array, from: number, to: number): boolean {
 }
 
 /**
+ * The IPv4-mapped `0xffff` marker sits at bytes[10:12] canonically
+ * (`::ffff:0:0/96`), but zero-compression can legally shift it earlier: the
+ * literal `::ffff:0:127.0.0.1` parses to `0:0:0:0:ffff:0:7f00:1`, putting the
+ * marker at bytes[8:10] with an explicit zero group after it. Scanning every
+ * 16-bit-aligned position instead of trusting one fixed offset closes that
+ * regardless of how many zero groups separate the marker from the embedded
+ * address.
+ */
+function ipv4MappedMarkerAt(bytes: Uint8Array): boolean {
+  for (let marker = 2; marker <= 10; marker += 2) {
+    if (allZero(bytes, 0, marker) && bytes[marker] === 0xff && bytes[marker + 1] === 0xff &&
+        allZero(bytes, marker + 2, 12)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Any IPv6 form that can carry an embedded IPv4 destination is unwrapped and
  * re-checked with the IPv4 rules, so `::ffff:127.0.0.1` cannot smuggle loopback.
  */
 function blockedIpv6(bytes: Uint8Array): boolean {
-  if (allZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
-    return blockedIpv4(bytes.subarray(12));                   // IPv4-mapped ::ffff:0:0/96
+  if (ipv4MappedMarkerAt(bytes)) {
+    return blockedIpv4(bytes.subarray(12));                   // IPv4-mapped, canonical or shifted
   }
   if (allZero(bytes, 0, 12)) return true;                     // ::, ::1 and IPv4-compatible
   if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b &&
