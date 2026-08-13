@@ -10,7 +10,7 @@ import {
 } from "../src/auth/api-key.js";
 
 const rawKey = `pcp_${"a".repeat(64)}`;
-const keyHash = createHash("sha256").update(rawKey).digest("hex");
+const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
 
 class MemoryApiKeyRepository implements ApiKeyRepository {

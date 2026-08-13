@@ -52,7 +52,7 @@ export function createApiKeyAuthenticator(repository: ApiKeyRepository) {
       throw new ApiError(401, "invalid_api_key", "The API key is invalid");
     }
 
-    const keyHash = createHash("sha256").update(match[1]).digest("hex");
+    const keyHash = createHash("sha256").update(match[1].slice(4)).digest("hex");
     const record = await repository.findByHash(keyHash);
     if (record === null) {
       throw new ApiError(401, "invalid_api_key", "The API key is invalid");

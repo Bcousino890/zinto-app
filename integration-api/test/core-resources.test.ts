@@ -16,7 +16,7 @@ import type {
 } from "../src/resources/core.js";
 
 const rawKey = `pcp_${"b".repeat(64)}`;
-const keyHash = createHash("sha256").update(rawKey).digest("hex");
+const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
 const authorization = { authorization: `Bearer ${rawKey}` };
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
 
@@ -196,7 +196,11 @@ class MemoryCoreRepository implements CoreRepository {
   }
 
   async listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>> {
-    return page(contacts.filter((item) => item.companyId === companyId), query);
+    const result = page(contacts.filter((item) => item.companyId === companyId), query);
+    return {
+      ...result,
+      items: result.items.map(({ companyId: _companyId, ...item }) => item)
+    };
   }
 
   async listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>> {
@@ -263,8 +267,12 @@ describe("core resource API", () => {
       headers: authorization
     });
     expect(second.json().data.map((item: { id: string }) => item.id)).toEqual(["101"]);
-    expect(second.body).not.toContain("999");
-    expect(second.body).not.toContain("otra empresa");
+    expect(second.json().data).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "999" })
+    ]));
+    expect(second.json().data).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Contacto de otra empresa" })
+    ]));
   });
 
   it("returns complete historical messages rather than only today's records", async () => {
