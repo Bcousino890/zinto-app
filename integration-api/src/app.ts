@@ -4,10 +4,13 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 
 import type { ApiKeyRepository } from "./auth/api-key.js";
 import { registerErrorHandlers } from "./http/errors.js";
+import type { CoreRepository } from "./resources/core.js";
+import { registerCoreRoutes } from "./routes/core.js";
 import { registerMeRoute } from "./routes/me.js";
 
 export interface AppOptions {
   apiKeyRepository?: ApiKeyRepository;
+  coreRepository?: CoreRepository;
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
@@ -38,6 +41,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   if (options.apiKeyRepository !== undefined) {
     registerMeRoute(app, options.apiKeyRepository);
+    if (options.coreRepository !== undefined) {
+      registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository);
+    }
   }
   if (options.onClose !== undefined) {
     app.addHook("onClose", options.onClose);
