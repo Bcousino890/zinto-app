@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: zinto-integration-api:0.1.0
     container_name: zinto-integration-api-preview
     restart: unless-stopped

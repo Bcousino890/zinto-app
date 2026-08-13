@@ -14,6 +14,16 @@ describe("preview deployment artifacts", () => {
     expect(dockerfile).not.toMatch(/COPY .*\.env/);
   });
 
+  it("stamps the built image with the commit it was produced from", async () => {
+    const dockerfile = await read("Dockerfile");
+    const compose = await read("deploy/docker-compose.preview.yml");
+
+    expect(dockerfile).toContain("ARG GIT_COMMIT");
+    expect(dockerfile).toContain("LABEL org.opencontainers.image.revision=$GIT_COMMIT");
+    expect(dockerfile).toContain("/app/RELEASE");
+    expect(compose).toContain("GIT_COMMIT: ${GIT_COMMIT:-unknown}");
+  });
+
   it("binds only to localhost and enforces a read-only container", async () => {
     const compose = await read("deploy/docker-compose.preview.yml");
 
