@@ -91,6 +91,7 @@ BEGIN
     RETURN COALESCE(NEW, OLD);
   END IF;
   event_company_id := COALESCE(NEW.company_id, OLD.company_id);
+  IF event_company_id IS NULL THEN RETURN COALESCE(NEW, OLD); END IF;
 
   IF TG_OP = 'INSERT' THEN
     INSERT INTO integration_api_outbox (company_id, event_type, resource_type, resource_id, payload)
@@ -163,6 +164,7 @@ CREATE OR REPLACE FUNCTION integration_api_capture_conversation_event()
 RETURNS trigger AS $$
 BEGIN
   IF current_setting('zinto.integration_api_origin', true) = 'api' THEN RETURN NEW; END IF;
+  IF NEW.company_id IS NULL THEN RETURN NEW; END IF;
   INSERT INTO integration_api_outbox (company_id, event_type, resource_type, resource_id, payload)
   VALUES (NEW.company_id, CASE TG_OP WHEN 'INSERT' THEN 'conversation.created' ELSE 'conversation.updated' END,
     'conversation', NEW.id,
@@ -206,6 +208,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION integration_api_capture_channel_event()
 RETURNS trigger AS $$
 BEGIN
+  IF current_setting('zinto.integration_api_origin', true) = 'api' THEN RETURN NEW; END IF;
   IF NEW.company_id IS NULL OR NEW.status IS NOT DISTINCT FROM OLD.status THEN RETURN NEW; END IF;
   INSERT INTO integration_api_outbox (company_id, event_type, resource_type, resource_id, payload)
   VALUES (NEW.company_id, 'channel.connection.updated', 'channel', NEW.id,
