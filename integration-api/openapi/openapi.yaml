@@ -1,0 +1,716 @@
+openapi: 3.1.0
+info:
+  title: Zinto Integration API
+  version: 0.1.0
+  summary: Bidirectional, tenant-safe API for Zinto partners
+  description: |
+    Integrate external systems with Zinto contacts, conversations, complete
+    message history, channel delivery, notes, tags, and signed webhooks.
+    Tenant identity always comes from the API key; clients never send company_id.
+servers:
+  - url: https://crm.zinto.app/_integration-api
+    description: Controlled preview on the Zinto VPS
+tags:
+  - name: System
+  - name: Identity
+  - name: Channels
+  - name: Contacts
+  - name: Conversations
+  - name: Messages
+  - name: Webhooks
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      security: []
+      summary: Check service liveness
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/me:
+    get:
+      tags: [Identity]
+      operationId: getApiIdentity
+      summary: Inspect the authenticated company and scopes
+      responses:
+        "200":
+          description: Authenticated identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/channels:
+    get:
+      tags: [Channels]
+      operationId: listChannels
+      summary: List company channels and supported capabilities
+      responses:
+        "200":
+          description: Company channel list without provider credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Channel" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/contacts:
+    get:
+      tags: [Contacts]
+      operationId: listContacts
+      summary: List contacts with cursor pagination
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Contact page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Contact" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Contacts]
+      operationId: createContact
+      summary: Create a contact
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactCreate" }
+      responses:
+        "201":
+          description: Contact created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/contacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    patch:
+      tags: [Contacts]
+      operationId: updateContact
+      summary: Update allowed contact fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactUpdate" }
+      responses:
+        "200":
+          description: Contact updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Contacts]
+      operationId: archiveContact
+      summary: Archive a contact
+      responses:
+        "200":
+          description: Contact archived
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/contacts/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    post:
+      tags: [Contacts]
+      operationId: createContactNote
+      summary: Add a historical note to a contact
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteInput" }
+      responses:
+        "201":
+          description: Note created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoteResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    patch:
+      tags: [Contacts]
+      operationId: updateContactNote
+      summary: Update a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteInput" }
+      responses:
+        "200":
+          description: Note updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoteResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Contacts]
+      operationId: deleteContactNote
+      summary: Delete a note
+      responses:
+        "204": { description: Note deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/contacts/{id}/tags/{tag}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+      - name: tag
+        in: path
+        required: true
+        schema: { type: string, minLength: 1, maxLength: 100 }
+    put:
+      tags: [Contacts]
+      operationId: attachContactTag
+      summary: Attach a tag idempotently
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Contacts]
+      operationId: detachContactTag
+      summary: Detach a tag idempotently
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/conversations:
+    get:
+      tags: [Conversations]
+      operationId: listConversations
+      summary: List conversations
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Conversation page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Conversation" }
+  /api/v1/conversations/{id}/messages:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Conversations]
+      operationId: listConversationMessages
+      summary: Read complete message history across all dates
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Historical message page, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Message" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/messages/send:
+    post:
+      tags: [Messages]
+      operationId: sendTextMessage
+      summary: Send text through a selected channel
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TextMessageInput" }
+      responses:
+        "201": { $ref: "#/components/responses/MessageAccepted" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "504": { $ref: "#/components/responses/DeliveryTimeout" }
+  /api/v1/messages/send-media:
+    post:
+      tags: [Messages]
+      operationId: sendMediaMessage
+      summary: Send public media through a selected channel
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaMessageInput" }
+      responses:
+        "201": { $ref: "#/components/responses/MessageAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "504": { $ref: "#/components/responses/DeliveryTimeout" }
+  /api/v1/messages/send-template:
+    post:
+      tags: [Messages]
+      operationId: sendTemplateMessage
+      summary: Send an approved WhatsApp template
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TemplateMessageInput" }
+      responses:
+        "201": { $ref: "#/components/responses/MessageAccepted" }
+        "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "504": { $ref: "#/components/responses/DeliveryTimeout" }
+  /api/v1/messages/send-interactive:
+    post:
+      tags: [Messages]
+      operationId: sendInteractiveMessage
+      summary: Send an interactive WhatsApp message
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InteractiveMessageInput" }
+      responses:
+        "201": { $ref: "#/components/responses/MessageAccepted" }
+        "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "504": { $ref: "#/components/responses/DeliveryTimeout" }
+  /api/v1/webhooks:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      summary: List webhook endpoints without secrets
+      responses:
+        "200":
+          description: Webhook endpoint list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEndpoint" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+    post:
+      tags: [Webhooks]
+      operationId: createWebhook
+      summary: Register an HTTPS endpoint; secret is returned once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookCreate" }
+      responses:
+        "201":
+          description: Webhook endpoint and one-time signing secret
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/WebhookEndpoint"
+                      - type: object
+                        properties:
+                          secret: { type: string, pattern: '^whsec_[a-f0-9]{64}$' }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/webhooks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    delete:
+      tags: [Webhooks]
+      operationId: disableWebhook
+      summary: Disable a webhook endpoint
+      responses:
+        "204": { description: Endpoint disabled }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: pcp_<64 lowercase hex characters>
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^\d+$' }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by the previous page
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique operation key. Reuse with a different body returns 409.
+      schema: { type: string, minLength: 1, maxLength: 255 }
+  responses:
+    BadRequest:
+      description: Validation or safety check failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Unauthorized:
+      description: API key missing, invalid, inactive, or expired
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Required scope or source IP is not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: Resource is absent or belongs to another company
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: Idempotency conflict or inactive channel
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    UnsupportedCapability:
+      description: Selected channel does not support the operation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    DeliveryTimeout:
+      description: Delivery may have occurred; retrying automatically is unsafe
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    MessageAccepted:
+      description: Message accepted by the existing Zinto delivery engine
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/MessageDeliveryResponse" }
+  schemas:
+    RequestMeta:
+      type: object
+      required: [request_id]
+      properties:
+        request_id: { type: string, pattern: '^req_' }
+    PageMeta:
+      allOf:
+        - $ref: "#/components/schemas/RequestMeta"
+        - type: object
+          required: [next_cursor, has_more]
+          properties:
+            next_cursor: { type: [string, "null"] }
+            has_more: { type: boolean }
+    PageResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: {} }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: array, items: {} }
+            request_id: { type: string }
+    HealthResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [service, status, version]
+          properties:
+            service: { const: zinto-integration-api }
+            status: { const: ok }
+            version: { type: string }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    IdentityResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            api_key:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+            company:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+            scopes: { type: array, items: { type: string } }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    Channel:
+      type: object
+      required: [id, type, name, status, capabilities]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        name: { type: string }
+        status: { type: string }
+        capabilities: { type: array, items: { type: string } }
+    ContactFields:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        email: { type: [string, "null"], format: email }
+        phone: { type: [string, "null"] }
+        avatar_url: { type: [string, "null"], format: uri }
+        company: { type: [string, "null"] }
+        tags: { type: array, items: { type: string } }
+        source: { type: [string, "null"] }
+        notes: { type: [string, "null"] }
+        custom_fields: { type: object, additionalProperties: true }
+    ContactCreate:
+      allOf:
+        - $ref: "#/components/schemas/ContactFields"
+        - type: object
+          required: [name]
+          additionalProperties: false
+    ContactUpdate:
+      allOf:
+        - $ref: "#/components/schemas/ContactFields"
+        - type: object
+          minProperties: 1
+          additionalProperties: false
+    Contact:
+      allOf:
+        - $ref: "#/components/schemas/ContactFields"
+        - type: object
+          required: [id, name, tags, custom_fields, archived, created_at, updated_at]
+          properties:
+            id: { type: string }
+            archived: { type: boolean }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    ContactResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Contact" }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    NoteInput:
+      type: object
+      required: [content]
+      additionalProperties: false
+      properties:
+        content: { type: string, minLength: 1, maxLength: 20000 }
+    Note:
+      type: object
+      required: [id, contact_id, created_by_id, content, created_at, updated_at]
+      properties:
+        id: { type: string }
+        contact_id: { type: string }
+        created_by_id: { type: string }
+        content: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NoteResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Note" }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    Conversation:
+      type: object
+      properties:
+        id: { type: string }
+        contact_id: { type: [string, "null"] }
+        channel_id: { type: string }
+        channel_type: { type: string }
+        status: { type: string }
+        assigned_to_user_id: { type: [string, "null"] }
+        last_message_at: { type: [string, "null"], format: date-time }
+        unread_count: { type: integer }
+        bot_disabled: { type: boolean }
+        archived: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Message:
+      type: object
+      properties:
+        id: { type: string }
+        conversation_id: { type: string }
+        external_id: { type: [string, "null"] }
+        direction: { type: string, enum: [incoming, outgoing] }
+        type: { type: string }
+        content: { type: string }
+        status: { type: string }
+        sender_id: { type: [string, "null"] }
+        sender_type: { type: [string, "null"] }
+        from_bot: { type: boolean }
+        media_url: { type: [string, "null"] }
+        sent_at: { type: [string, "null"], format: date-time }
+        read_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    TextMessageInput:
+      type: object
+      required: [channel_id, to, message]
+      additionalProperties: false
+      properties:
+        channel_id: { type: string, pattern: '^\d+$' }
+        to: { type: string, minLength: 1, maxLength: 320 }
+        message: { type: string, minLength: 1, maxLength: 4096 }
+    MediaMessageInput:
+      type: object
+      required: [channel_id, to, media_type, media_url]
+      additionalProperties: false
+      properties:
+        channel_id: { type: string, pattern: '^\d+$' }
+        to: { type: string }
+        media_type: { type: string, enum: [image, video, audio, document] }
+        media_url: { type: string, format: uri, description: Public HTTP(S) URL; private addresses are rejected }
+        caption: { type: string, maxLength: 1024 }
+        filename: { type: string, maxLength: 255 }
+    TemplateMessageInput:
+      type: object
+      required: [channel_id, to, template_name]
+      additionalProperties: false
+      properties:
+        channel_id: { type: string, pattern: '^\d+$' }
+        to: { type: string }
+        template_name: { type: string }
+        template_language: { type: string, default: en }
+        components: { type: array, items: {} }
+    InteractiveMessageInput:
+      type: object
+      required: [channel_id, to, interactive_type, body, action]
+      additionalProperties: false
+      properties:
+        channel_id: { type: string, pattern: '^\d+$' }
+        to: { type: string }
+        interactive_type: { type: string, enum: [button, list] }
+        body: { type: string, minLength: 1, maxLength: 1024 }
+        header: { type: string, maxLength: 60 }
+        footer: { type: string, maxLength: 60 }
+        action: { type: object, additionalProperties: true }
+    MessageDelivery:
+      type: object
+      properties:
+        id: { type: string }
+        external_id: { type: [string, "null"] }
+        status: { type: string }
+        timestamp: { type: string, format: date-time }
+        channel_type: { type: string }
+        conversation_id: { type: string }
+    MessageDeliveryResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/MessageDelivery" }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    WebhookCreate:
+      type: object
+      required: [url, event_types]
+      additionalProperties: false
+      properties:
+        url: { type: string, format: uri, description: Public HTTPS endpoint }
+        event_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/WebhookEventType" }
+    WebhookEndpoint:
+      type: object
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri }
+        event_types: { type: array, items: { $ref: "#/components/schemas/WebhookEventType" } }
+        active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    WebhookEventType:
+      type: string
+      enum:
+        - contact.created
+        - contact.updated
+        - contact.deleted
+        - conversation.created
+        - conversation.updated
+        - message.created
+        - message.status.updated
+        - note.created
+        - note.updated
+        - note.deleted
+        - tag.attached
+        - tag.detached
+        - deal.created
+        - deal.updated
+        - deal.stage.changed
+        - deal.deleted
+        - task.created
+        - task.updated
+        - task.completed
+        - task.deleted
+        - channel.connection.updated
+    WebhookEvent:
+      type: object
+      required: [id, type, schema_version, occurred_at, data]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: "#/components/schemas/WebhookEventType" }
+        schema_version: { type: integer, const: 1 }
+        occurred_at: { type: string, format: date-time }
+        data: {}
