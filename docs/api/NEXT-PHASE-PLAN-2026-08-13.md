@@ -9,37 +9,32 @@ y el 5 no deben empezarse antes de tener staging, porque implican escrituras.
 
 ---
 
-## Bloque 1 — Cerrar el riesgo residual de media (bloqueante)
+## Bloque 1 — Cerrar el riesgo residual de media (IMPLEMENTADO, desactivado)
 
-**Problema.** La API autoriza el destino de `media_url` pero no descarga: lo hace
-el motor legacy con su propio cliente. Entre validacion y descarga hay una
-ventana de DNS rebinding que nuestro pinning no cubre.
+**Estado:** la opcion B se implemento completa. Detalle en
+`docs/api/MEDIA-PROXY-2026-08-13.md`. La API descarga la media con `safe-fetch`
+(pinning real de socket), la guarda con nombre aleatorio de 256 bits y entrega
+al motor legacy solo una URL interna; el motor nunca ve la direccion del
+partner. 16 pruebas, incluida una de extremo a extremo. Desactivado por
+defecto (`MEDIA_PROXY_ENABLED=false`) y con fallo cerrado si se activa sin la
+variable de destino interno.
 
-**Opciones evaluadas:**
+**La auditoria del motor legacy confirmo por que esto era necesario, con mas
+gravedad de la asumida:** `LEGACY-ENGINE-AUDIT-2026-08-13.md` (pregunta 3)
+verifico que la descarga de salida en ambos canales de WhatsApp no tiene
+**ninguna** defensa — sin resolucion previa, sin `maxRedirects`, sin limite de
+tamano, sigue redirecciones con el limite por defecto de la libreria (21
+saltos). Lo notable: las rutas de **entrada** de media del mismo motor si estan
+bien endurecidas (lookup fijado, `maxRedirects:0`, limite de tamano) — el
+patron correcto existe en su propio codigo, simplemente no se aplico a la
+salida. Confirma que nuestro proxy no es una precaucion excesiva: es la unica
+defensa real en toda la cadena para `send-media`.
 
-| Opcion | Coste | Robustez | Depende del compilado |
-| --- | --- | --- | --- |
-| A. Que el motor legacy use un cliente con pinning | alto | alta | si |
-| B. La API descarga con `safe-fetch` y entrega URL interna | medio | alta | no |
-| C. Lista de dominios permitidos por empresa | bajo | media | no |
-
-**Recomendacion: opcion B**, y C como refuerzo. B es la unica robusta que no
-exige modificar el compilado, que es precisamente lo que el runbook prohibe
-tocar.
-
-**Pasos:**
-
-1. Prueba roja: un destino que responde publico en la validacion y privado en la
-   descarga debe fallar de forma cerrada.
-2. `safe-fetch` descarga la media con limite de tamano y de tipo MIME declarado.
-3. Guardar en almacenamiento controlado con nombre no adivinable, sin conservar
-   el nombre de fichero del cliente.
-4. Entregar al motor legacy una URL interna de confianza, nunca la del partner.
-5. Retencion y limpieza de lo descargado.
-6. Solo entonces habilitar `send-media`, y unicamente para el piloto.
-
-**Criterio de cierre:** existe una prueba automatizada que demuestra que un
-rebinding entre validacion y descarga ya no alcanza la red interna.
+**Pendiente antes de activar** (sin cambios respecto a `MEDIA-PROXY-2026-08-13.md`):
+volumen escribible para el contenedor read-only, aplicar la regla de Nginx que
+deniega `/_integration-api/internal/` (escrita pero no aplicada en el vhost),
+confirmar alcance de red del motor legacy al host interno, ajustar
+`MEDIA_MAX_BYTES` a limites reales del proveedor, y E2E autorizado.
 
 ---
 
@@ -81,32 +76,43 @@ inmediato.
 
 ## Bloque 4 — CRUD de pipelines, etapas, deals y tareas (Fase D)
 
-Se inspecciono el esquema real antes de planificar. **Hay tres trampas que
-deben resolverse antes de escribir una sola linea de implementacion.**
+La mitad de lectura ya esta implementada (ver
+`docs/api/PIPELINE-RESOURCES-2026-08-13.md`). Lo que sigue es sobre la mitad de
+escritura, hasta ahora bloqueada por incertidumbre. Esa incertidumbre **ya se
+resolvio**: `docs/api/LEGACY-ENGINE-AUDIT-2026-08-13.md` audito el bundle
+compilado en marcha (verificado byte a byte contra el contenedor de
+produccion) y establecio con confianza alta que columnas escribir.
 
-### Trampa 1 (critica): `deals.stage` y `deals.stage_id` son vocabularios distintos
+### Trampa 1 (RESUELTA): `deals.stage` y `deals.stage_id` son vocabularios distintos
 
-No es una denormalizacion. Son dos representaciones paralelas:
+Confirmado por auditoria de codigo, no solo por los datos: el CRM **lee
+`stage_id` casi en exclusiva** — tablero, filtros y paginacion son 100 %
+`stage_id` — y `stage` es un texto heredado que casi nadie lee, alimentado por
+dos mapeadores incoherentes (por subcadena y por diccionario exacto) que
+colapsan nombres de etapa en espanol como "Arrived" o "Envio prop" al valor por
+defecto `"lead"`. Ese es el mecanismo exacto detras de la divergencia observada
+en los 513 deals reales.
 
-- `deals.stage` es `text NOT NULL` con un enum heredado. Distribucion real:
-  `lead` 509, `qualified` 2, `closed_won` 1, `closed_lost` 1.
-- `deals.stage_id` referencia `pipeline_stages`, cuyos nombres son configurables
-  por el usuario: "Arrived", "Envio prop", "Descartado", "Demo Scheduled"...
+**Regla de escritura, ya especificada, no queda a interpretar:**
 
-Comprobacion ejecutada: **en los 513 deals, `stage` difiere del nombre de la
-etapa referenciada por `stage_id`.** Es decir, escribir el nombre de la etapa en
-`stage` corromperia el enum que el CRM compilado probablemente lee.
+1. Validar que la etapa destino pertenece al mismo `pipeline_id` del deal antes
+   de escribir; si no, es error, no un movimiento entre pipelines.
+2. Escribir **siempre** `stage_id` y `stage` juntas, en la misma transaccion.
+3. `stage` se calcula replicando el mapeador por subcadena del motor, literal,
+   incluido su orden de comprobaciones (tiene un fallo conocido: una etapa
+   llamada "Closed Lost" mapea a `closed_won` porque comprueba `"closed"` antes
+   que `"lost"` — replicarlo de todas formas, para no divergir mas del motor).
+4. Insertar una fila en `deal_activities` con `type: 'stage_change'`, como hace
+   el motor, usando el usuario real de la integracion en vez de su respaldo
+   `assigned_to_user_id || 1`.
+5. Nunca escribir `stage` sin `stage_id`: es exactamente lo que hace la unica
+   ruta del motor que desincroniza mas las dos columnas.
+6. Respetar la regla de negocio de un solo deal activo por contacto y pipeline
+   antes de mover un deal entre pipelines (el motor responde `409`).
 
-**Antes de implementar `deal.stage.changed` hay que determinar, observando el
-compilado en staging, cual de estas es cierta:**
-
-- el CRM lee `stage_id` y mantiene `stage` solo por compatibilidad;
-- el CRM lee `stage` y `stage_id` es lo nuevo;
-- ambos se leen en pantallas distintas, y entonces hace falta una tabla de
-  correspondencia explicita.
-
-**No implementar el cambio de etapa por adivinacion.** Un error aqui corrompe 513
-registros reales de clientes.
+El SQL exacto y el detalle completo estan en la seccion "Conclusion practica"
+de `LEGACY-ENGINE-AUDIT-2026-08-13.md`. Implementar `deal.stage.changed`
+siguiendo eso, con pruebas TDD antes del codigo.
 
 ### Trampa 2: `company_id` es NULL-able en `pipelines` y `pipeline_stages`
 
@@ -145,9 +151,40 @@ Para cada recurso, en este orden y nunca al reves:
 5. Anadir auditoria y outbox.
 6. Exponer las rutas.
 
-No delegar el CRUD al legacy si sus rutas no filtran por empresa. Recordar el
-pendiente 4 del runbook: **algunas rutas antiguas atribuyen los envios al usuario
-1**; hay que corregir la autoria antes de abrir escrituras publicas.
+No delegar el CRUD al legacy si sus rutas no filtran por empresa.
+
+### Bloqueante de autoria (RESUELTO por auditoria, sigue bloqueando escrituras)
+
+El runbook decia "algunas rutas antiguas atribuyen los envios al usuario 1"; la
+auditoria establecio que es **peor y mas preciso**: las cuatro rutas de envio,
+en todos los canales, escriben `sender_id = 1` como literal incrustado en el
+bundle compilado. No puede corregirse desde nuestra API porque el problema esta
+en el motor legacy al que delegamos el envio (`src/delivery/client.ts`), no en
+nuestro codigo. El middleware de autenticacion del CRM carga
+`api_keys.user_id` pero nunca lo propaga a la request, asi que ni siquiera es
+posible que el motor derive el autor real aunque quisiera.
+
+Caso aparte: `send-media` sobre `whatsapp_official` (el canal principal) no
+escribe `sender_id = 1`, sino `sender_id = NULL, is_from_bot = true` — marca el
+mensaje como de bot en vez de atribuirlo a nadie. Son dos defectos distintos con
+dos arreglos distintos.
+
+**Esto bloquea habilitar `messages:send` para un partner real:** cada mensaje
+que un partner envie por la API aparecera en el CRM como enviado por el
+usuario 1 (o como bot, en el caso de whatsapp_official), nunca por la
+integracion. Cualquier auditoria o soporte que dependa de saber quien envio un
+mensaje quedara ciega para trafico via API.
+
+**El arreglo esta identificado y es pequeno** (detalle completo en
+`LEGACY-ENGINE-AUDIT-2026-08-13.md`, pregunta 1): el middleware ya tiene el
+`user_id` en memoria, solo falta propagarlo (`r.userId = o.userId`) y sustituir
+los ~14 literales `1` en `XL.sendThroughChannel` / `XL.sendMediaThroughChannel`
+por ese valor. Pero es una modificacion al **bundle compilado en produccion**,
+sin fuente TypeScript original, sin tests de caracterizacion y sin build
+reproducible. No es un cambio para hacer a ciegas ni para incluir en esta rama
+sin decision explicita del propietario sobre como intervenir codigo compilado
+que ya sirve trafico real. Queda como bloqueante formal, con la causa raiz y la
+correccion exacta ya documentadas, a la espera de esa decision.
 
 Anadir tambien: creacion/seleccion explicita de conversacion por contacto+canal
 sin duplicados, filtros `updated_since` con orden determinista, y endpoints de
