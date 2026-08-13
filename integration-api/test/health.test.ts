@@ -147,6 +147,25 @@ describe("service health contract", () => {
     expect(response.json().error.code).toBe("not_found");
   });
 
+  it("does not turn an allowlist into a denylist when read-only mode is disabled", async () => {
+    const app = await buildApp({
+      apiKeyRepository: new MemoryApiKeyRepository(writeEnabledRecord),
+      logger: false,
+      readOnly: false,
+      writeEnabledApiKeyIds: new Set([999])
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts/1",
+      headers: { authorization: `Bearer ${rawKey}` }
+    });
+
+    expect(response.statusCode).not.toBe(503);
+    expect(response.json().error.code).not.toBe("read_only_mode");
+  });
+
   it("closes owned dependencies when the application stops", async () => {
     let closed = false;
     const app = await buildApp({

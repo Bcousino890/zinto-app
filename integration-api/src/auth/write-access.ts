@@ -4,6 +4,7 @@ import { ApiError } from "../http/errors.js";
 export interface WriteAccessPolicy {
   enabledApiKeyIds: ReadonlySet<number>;
   enabledCompanyIds: ReadonlySet<number>;
+  readOnly: boolean;
 }
 
 export function allowsAnyWrite(policy: WriteAccessPolicy): boolean {
@@ -11,6 +12,7 @@ export function allowsAnyWrite(policy: WriteAccessPolicy): boolean {
 }
 
 export function assertWriteEnabled(policy: WriteAccessPolicy, principal: ApiPrincipal): void {
+  if (!policy.readOnly) return;
   if (policy.enabledApiKeyIds.has(principal.apiKeyId)) return;
   if (policy.enabledCompanyIds.has(principal.companyId)) return;
   throw new ApiError(503, "read_only_mode", "Write operations are temporarily disabled");

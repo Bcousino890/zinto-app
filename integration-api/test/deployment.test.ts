@@ -37,12 +37,12 @@ describe("preview deployment artifacts", () => {
     expect(compose).not.toMatch(/Contrasena|PASSWORD=.*[^_]$/i);
   });
 
-  it("isolates the preview under a dedicated GET-only nginx prefix", async () => {
+  it("proxies the dedicated API prefix and leaves method authorization to Node", async () => {
     const nginx = await read("deploy/nginx-integration-api-preview.conf");
 
     expect(nginx).toContain("location /_integration-api/");
-    expect(nginx).toContain("limit_except GET HEAD OPTIONS");
     expect(nginx).toContain("proxy_pass http://127.0.0.1:3100/");
+    expect(nginx).not.toContain("limit_except GET HEAD OPTIONS");
   });
 
   it("denies the internal media prefix publicly", async () => {

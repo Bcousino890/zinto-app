@@ -8,7 +8,9 @@ function parseIdAllowlist(raw: string | undefined): number[] {
     const trimmed = segment.trim();
     if (!/^\d+$/.test(trimmed)) throw new Error("Write allowlists must contain comma-separated numeric IDs");
     const value = Number(trimmed);
-    if (value < 1) throw new Error("Write allowlists must contain only positive IDs");
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error("Write allowlists must contain only positive safe integer IDs");
+    }
     return value;
   }))];
 }

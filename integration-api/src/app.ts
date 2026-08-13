@@ -70,11 +70,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   const rateLimiter = options.rateLimiter ?? new RateLimiter(defaultRateLimitConfig);
   const writeAccessPolicy: WriteAccessPolicy = {
     enabledApiKeyIds: options.writeEnabledApiKeyIds ?? new Set<number>(),
-    enabledCompanyIds: options.writeEnabledCompanyIds ?? new Set<number>()
+    enabledCompanyIds: options.writeEnabledCompanyIds ?? new Set<number>(),
+    readOnly: options.readOnly ?? true
   };
   app.addHook("onRequest", createIpRateLimitHook(rateLimiter));
 
-  const readOnly = options.readOnly ?? true;
+  const readOnly = writeAccessPolicy.readOnly;
   function isApiMutation(request: FastifyRequest): boolean {
     return request.url.startsWith("/api/v1/") && !["GET", "HEAD", "OPTIONS"].includes(request.method);
   }

@@ -49,6 +49,7 @@ describe("safe deployment configuration", () => {
   it("rejects invalid write allowlist values", () => {
     expect(() => loadConfig({ ...required, WRITE_ENABLED_API_KEY_IDS: "0,7" })).toThrow();
     expect(() => loadConfig({ ...required, WRITE_ENABLED_COMPANY_IDS: "3,nope" })).toThrow();
+    expect(() => loadConfig({ ...required, WRITE_ENABLED_API_KEY_IDS: "9007199254740992" })).toThrow();
   });
 
   it("keeps the media proxy disabled unless it is switched on explicitly", () => {
