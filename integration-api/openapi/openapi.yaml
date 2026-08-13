@@ -232,6 +232,134 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ContactResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/pipelines:
+    get:
+      tags: [Pipelines]
+      operationId: listPipelines
+      summary: List the pipelines of the authenticated company
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+      responses:
+        "200":
+          description: Pipeline page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Pipeline" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/pipelines/{id}/stages:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Pipelines]
+      operationId: listPipelineStages
+      summary: List the stages of a pipeline owned by the company
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+      responses:
+        "200":
+          description: Pipeline stage page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/PipelineStage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/deals:
+    get:
+      tags: [Deals]
+      operationId: listDeals
+      summary: List deals with cursor pagination
+      description: >
+        stage_key carries the legacy stage vocabulary while stage_id and
+        stage_name describe the configurable pipeline stage. They are distinct
+        fields on purpose and must not be derived from one another.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: pipeline_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+        - name: contact_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+      responses:
+        "200":
+          description: Deal page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Deal" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/deals/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Deals]
+      operationId: getDeal
+      summary: Fetch a single deal owned by the company
+      responses:
+        "200":
+          description: Deal
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: "#/components/schemas/Deal" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/tasks:
+    get:
+      tags: [Tasks]
+      operationId: listTasks
+      summary: List contact tasks with cursor pagination
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: contact_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+      responses:
+        "200":
+          description: Task page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Task" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /api/v1/conversations:
     get:
       tags: [Conversations]
@@ -430,6 +558,13 @@ components:
       required: true
       description: Unique operation key. Reuse with a different body returns 409.
       schema: { type: string, minLength: 1, maxLength: 255 }
+    UpdatedSince:
+      name: updated_since
+      in: query
+      description: >
+        Return only records updated at or after this instant. Ordering stays by
+        creation so a page remains stable while records are being updated.
+      schema: { type: string, format: date-time }
   responses:
     BadRequest:
       description: Validation or safety check failed
@@ -581,6 +716,83 @@ components:
       properties:
         data: { $ref: "#/components/schemas/Contact" }
         meta: { $ref: "#/components/schemas/RequestMeta" }
+    Pipeline:
+      type: object
+      required: [id, name, is_default, is_template, order_num, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        icon: { type: [string, "null"] }
+        color: { type: [string, "null"] }
+        is_default: { type: boolean }
+        is_template: { type: boolean }
+        template_category: { type: [string, "null"] }
+        order_num: { type: integer }
+        created_by_user_id: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PipelineStage:
+      type: object
+      required: [id, pipeline_id, name, color, order_num, created_at, updated_at]
+      properties:
+        id: { type: string }
+        pipeline_id: { type: string }
+        name: { type: string }
+        color: { type: string }
+        order_num: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Deal:
+      type: object
+      required: [id, pipeline_id, contact_id, title, stage_key, tags, custom_fields, created_at, updated_at]
+      properties:
+        id: { type: string }
+        pipeline_id: { type: string }
+        contact_id: { type: string }
+        title: { type: string }
+        stage_key:
+          type: string
+          description: Legacy stage vocabulary stored on the deal itself.
+        stage_id:
+          type: [string, "null"]
+          description: Configurable pipeline stage; a different vocabulary from stage_key.
+        stage_name:
+          type: [string, "null"]
+          description: Null when the stage reference does not resolve inside the same pipeline and company.
+        value: { type: [integer, "null"] }
+        priority: { type: [string, "null"] }
+        status: { type: [string, "null"] }
+        due_date: { type: [string, "null"], format: date-time }
+        assigned_to_user_id: { type: [string, "null"] }
+        description: { type: [string, "null"] }
+        tags: { type: array, items: { type: string } }
+        custom_fields: { type: object, additionalProperties: true }
+        last_activity_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Task:
+      type: object
+      required: [id, contact_id, title, priority, status, tags, created_at, updated_at]
+      properties:
+        id: { type: string }
+        contact_id: { type: string }
+        title: { type: string }
+        description: { type: [string, "null"] }
+        priority: { type: string }
+        status: { type: string }
+        due_date: { type: [string, "null"], format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        assigned_to:
+          type: [string, "null"]
+          description: Free text in the schema; it is not a validated user reference.
+        category: { type: [string, "null"] }
+        tags: { type: array, items: { type: string } }
+        background_color: { type: [string, "null"] }
+        created_by_user_id: { type: [string, "null"] }
+        updated_by_user_id: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     NoteInput:
       type: object
       required: [content]
