@@ -68,6 +68,11 @@ describe("OpenAPI partner contract", () => {
       "GET /api/v1/conversations/{id}/messages",
       "GET /api/v1/deals",
       "GET /api/v1/deals/{id}",
+      "GET /api/v1/flow-templates",
+      "GET /api/v1/flows",
+      "GET /api/v1/flows/{id}",
+      "GET /api/v1/flows/{id}/executions",
+      "GET /api/v1/flows/{id}/sessions",
       "GET /api/v1/me",
       "GET /api/v1/messages/{id}",
       "GET /api/v1/pipelines",
@@ -116,7 +121,7 @@ describe("OpenAPI partner contract", () => {
       conversationMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
       mediaStore: stub, pipelineMutationRepository: stub, pipelineCrudRepository: stub, pipelineRepository: stub,
-      taskMutationRepository: stub, dealMutationRepository: stub, webhookRepository: stub
+      taskMutationRepository: stub, dealMutationRepository: stub, flowReadRepository: stub, webhookRepository: stub
     } as never);
     const registered = routesOf(app.printRoutes({ commonPrefix: false }));
     await app.close();

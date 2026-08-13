@@ -18,6 +18,7 @@ tags:
   - name: Conversations
   - name: Messages
   - name: Webhooks
+  - name: Flows
 security:
   - bearerAuth: []
 paths:
@@ -85,6 +86,68 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Channel" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/flows:
+    get:
+      tags: [Flows]
+      operationId: listFlows
+      summary: List company flows
+      description: Requires `flows:read`; results are restricted to the API-key company.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200": { description: Flow page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/flows/{id}:
+    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+    get:
+      tags: [Flows]
+      operationId: getFlow
+      summary: Get a company flow
+      responses:
+        "200": { description: Flow, content: { application/json: { schema: { $ref: "#/components/schemas/Flow" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/flows/{id}/sessions:
+    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+    get:
+      tags: [Flows]
+      operationId: listFlowSessions
+      summary: List sessions for a company flow
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: Session page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/flows/{id}/executions:
+    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+    get:
+      tags: [Flows]
+      operationId: listFlowExecutions
+      summary: List executions for a company flow
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: Execution page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/flow-templates:
+    get:
+      tags: [Flows]
+      operationId: listFlowTemplates
+      summary: List active global flow templates
+      description: The source schema defines templates as a global catalog, not company-private data.
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: Template page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/contacts:
@@ -1237,6 +1300,75 @@ components:
         name: { type: string }
         status: { type: string }
         capabilities: { type: array, items: { type: string } }
+    Flow:
+      type: object
+      required: [id, name, status, nodes, edges, version, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        status: { type: string, enum: [draft, active, inactive, archived] }
+        nodes: { type: array, items: {} }
+        edges: { type: array, items: {} }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowSession:
+      type: object
+      required: [id, session_id, flow_id, conversation_id, contact_id, status, trigger_node_id, execution_path, session_data, started_at, last_activity_at, created_at, updated_at]
+      properties:
+        id: { type: string }
+        session_id: { type: string }
+        flow_id: { type: string }
+        conversation_id: { type: string }
+        contact_id: { type: string }
+        status: { type: string }
+        current_node_id: { type: [string, "null"] }
+        trigger_node_id: { type: string }
+        execution_path: { type: array, items: {} }
+        session_data: { type: object, additionalProperties: true }
+        started_at: { type: string, format: date-time }
+        last_activity_at: { type: string, format: date-time }
+        completed_at: { type: [string, "null"] }
+        expires_at: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowExecution:
+      type: object
+      required: [id, execution_id, flow_id, conversation_id, contact_id, status, trigger_node_id, execution_path, started_at, last_activity_at, created_at, updated_at]
+      properties:
+        id: { type: string }
+        execution_id: { type: string }
+        flow_id: { type: string }
+        conversation_id: { type: string }
+        contact_id: { type: string }
+        status: { type: string }
+        trigger_node_id: { type: string }
+        current_node_id: { type: [string, "null"] }
+        execution_path: { type: array, items: {} }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: [string, "null"] }
+        last_activity_at: { type: string, format: date-time }
+        total_duration_ms: { type: [integer, "null"] }
+        completion_rate: { type: [number, "null"] }
+        error_message: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowTemplate:
+      type: object
+      required: [id, name, category, business_type, nodes, edges, tags, is_active, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        category: { type: string }
+        business_type: { type: string }
+        nodes: { type: array, items: {} }
+        edges: { type: array, items: {} }
+        tags: { type: array, items: { type: string } }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     ContactFields:
       type: object
       properties:
