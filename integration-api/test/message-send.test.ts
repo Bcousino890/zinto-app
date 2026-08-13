@@ -102,6 +102,7 @@ async function makeApp() {
     apiKeyRepository: new MemoryApiKeys(),
     coreRepository: new MemoryCore(),
     deliveryClient: delivery,
+    hostResolver: async () => ["93.184.216.34"],
     idempotencyRepository: new MemoryIdempotency(),
     logger: false,
     readOnly: false
@@ -212,6 +213,24 @@ describe("message delivery adapter", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe("unsafe_media_url");
+    expect(delivery.requests).toHaveLength(0);
+  });
+
+  it("refuses a safe media URL when the proxy is not configured, rather than forwarding it raw", async () => {
+    // Forwarding the partner URL to the legacy engine unmodified is exactly the
+    // rebinding window the media proxy exists to close; silently falling back
+    // to it once writes are enabled would reopen that window without anyone
+    // flipping a security-relevant flag on purpose.
+    const { app, delivery } = await makeApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send-media",
+      headers: { ...baseHeaders, "idempotency-key": "media-no-proxy" },
+      payload: { channel_id: "22", to: "+34606806103", media_type: "image", media_url: "https://cdn.partner.example/a.png" }
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe("media_proxy_disabled");
     expect(delivery.requests).toHaveLength(0);
   });
 

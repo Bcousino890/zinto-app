@@ -143,12 +143,14 @@ export function registerMessageSendRoutes(
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "media");
     await assertSafeMediaUrl(input.media_url, resolveHost);
-    // Without the proxy the engine resolves the partner URL itself, which is the
-    // rebinding window we cannot close from here; with it, the engine only ever
-    // sees an address we control.
-    const mediaUrl = mediaProxy === undefined
-      ? input.media_url
-      : await mediaProxy.prepare(input.media_url, input.media_type);
+    if (mediaProxy === undefined) {
+      // Forwarding the partner URL to the legacy engine unmodified is exactly
+      // the rebinding window the proxy exists to close: the engine resolves it
+      // again with its own client, outside our pinning. Refusing loudly here
+      // means enabling writes can never reopen that window silently.
+      throw new ApiError(503, "media_proxy_disabled", "Media delivery is temporarily disabled");
+    }
+    const mediaUrl = await mediaProxy.prepare(input.media_url, input.media_type);
     return performDelivery(request, reply, idempotency, delivery, {
       kind: "media",
       bearerToken: bearerToken(request),

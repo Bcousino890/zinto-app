@@ -18,6 +18,7 @@ import type {
   WebhookEndpoint,
   WebhookRepository
 } from "../src/webhooks/repository.js";
+import type { MediaProxy } from "../src/media/proxy.js";
 import { isBlockedIpAddress } from "../src/net/ip-rules.js";
 import { assertSafeDestination, UnsafeDestinationError } from "../src/net/destination.js";
 import { createSafeFetch } from "../src/net/safe-fetch.js";
@@ -332,6 +333,10 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
+const stubMediaProxy: MediaProxy = {
+  async prepare(url) { return url.replace("https://cdn.partner.example", "http://internal-media/x"); }
+};
+
 async function makeApp(resolve: (hostname: string) => Promise<string[]>) {
   const delivery = new RecordingDelivery();
   const app = await buildApp({
@@ -341,6 +346,7 @@ async function makeApp(resolve: (hostname: string) => Promise<string[]>) {
     hostResolver: resolve,
     idempotencyRepository: new MemoryIdempotency(),
     logger: false,
+    mediaProxy: stubMediaProxy,
     readOnly: false,
     webhookRepository: new MemoryWebhooks()
   });

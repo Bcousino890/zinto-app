@@ -430,11 +430,12 @@ paths:
       description: >
         The media URL must resolve to a public address; private, loopback,
         link-local, CGNAT and reserved ranges are refused for both IPv4 and
-        IPv6. When the media proxy is enabled the service downloads the media
-        itself and forwards an internal URL to the delivery engine, so the
-        origin never learns which engine fetched it. Errors use the codes
-        unsafe_media_url, media_unreachable, media_too_large and
-        media_type_mismatch.
+        IPv6. The service downloads the media itself and forwards an internal
+        URL to the delivery engine, so the origin never learns which engine
+        fetched it; while that proxy is disabled the operation is refused
+        outright rather than forwarding the partner URL unmodified. Errors use
+        the codes unsafe_media_url, media_unreachable, media_too_large,
+        media_type_mismatch and media_proxy_disabled.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -446,6 +447,7 @@ paths:
         "201": { $ref: "#/components/responses/MessageAccepted" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
   /api/v1/messages/send-template:
     post:
@@ -566,6 +568,11 @@ components:
         creation so a page remains stable while records are being updated.
       schema: { type: string, format: date-time }
   responses:
+    ServiceUnavailable:
+      description: Operation temporarily disabled by a safety switch
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     BadRequest:
       description: Validation or safety check failed
       content:
