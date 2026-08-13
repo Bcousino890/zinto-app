@@ -11,6 +11,7 @@ import type { WebhookRepository } from "./webhooks/repository.js";
 import { globalBodyLimitBytes } from "./http/body-limits.js";
 import { ApiError, registerErrorHandlers } from "./http/errors.js";
 import { secureLoggerOptions } from "./http/logging.js";
+import { createIpRateLimitHook, defaultRateLimitConfig, RateLimiter } from "./http/rate-limit.js";
 import type { CoreRepository } from "./resources/core.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
@@ -27,6 +28,7 @@ export interface AppOptions {
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
+  rateLimiter?: RateLimiter;
   readOnly?: boolean;
   readinessCheck?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
@@ -41,6 +43,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     trustProxy: options.trustProxy ?? false
   });
   app.decorateRequest("apiPrincipal", null);
+
+  const rateLimiter = options.rateLimiter ?? new RateLimiter(defaultRateLimitConfig);
+  app.addHook("onRequest", createIpRateLimitHook(rateLimiter));
 
   app.addHook("onRequest", async (request) => {
     const readOnly = options.readOnly ?? true;
@@ -88,16 +93,17 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   if (options.apiKeyRepository !== undefined) {
-    registerMeRoute(app, options.apiKeyRepository);
+    registerMeRoute(app, options.apiKeyRepository, rateLimiter);
     if (options.coreRepository !== undefined) {
-      registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository);
+      registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository, rateLimiter);
     }
     if (options.contactMutationRepository !== undefined && options.idempotencyRepository !== undefined) {
       registerContactMutationRoutes(
         app,
         options.apiKeyRepository,
         options.contactMutationRepository,
-        options.idempotencyRepository
+        options.idempotencyRepository,
+        rateLimiter
       );
     }
     if (options.coreRepository !== undefined && options.idempotencyRepository !== undefined &&
@@ -108,7 +114,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.coreRepository,
         options.idempotencyRepository,
         options.deliveryClient,
-        options.hostResolver
+        options.hostResolver,
+        rateLimiter
       );
     }
     if (options.webhookRepository !== undefined) {
@@ -116,7 +123,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.webhookRepository,
-        options.hostResolver
+        options.hostResolver,
+        rateLimiter
       );
     }
   }

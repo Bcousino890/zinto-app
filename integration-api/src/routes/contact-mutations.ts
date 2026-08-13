@@ -5,6 +5,7 @@ import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-ke
 import { assertScopes } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 import type { ContactMutationRepository } from "../resources/contact-mutations.js";
 
 const nullableString = z.string().max(500).nullable();
@@ -35,8 +36,8 @@ function id(value: string, resource: string): number {
   return Number(value);
 }
 
-function protect(apiKeys: ApiKeyRepository, scope: string) {
-  const authenticate = createApiKeyAuthenticator(apiKeys);
+function protect(apiKeys: ApiKeyRepository, scope: string, rateLimiter?: RateLimiter) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
     assertScopes(request.apiPrincipal!.scopes, [scope]);
@@ -47,9 +48,10 @@ export function registerContactMutationRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
   repository: ContactMutationRepository,
-  idempotency: IdempotencyRepository
+  idempotency: IdempotencyRepository,
+  rateLimiter?: RateLimiter
 ): void {
-  app.post("/api/v1/contacts", { preHandler: protect(apiKeys, "contacts:write") }, async (request, reply) => {
+  app.post("/api/v1/contacts", { preHandler: protect(apiKeys, "contacts:write", rateLimiter) }, async (request, reply) => {
     const input = parse(createContactSchema, request.body);
     return withIdempotency(request, reply, idempotency, async () => {
       const data = await repository.createContact(
@@ -63,7 +65,7 @@ export function registerContactMutationRoutes(
 
   app.patch<{ Params: { id: string } }>(
     "/api/v1/contacts/:id",
-    { preHandler: protect(apiKeys, "contacts:write") },
+    { preHandler: protect(apiKeys, "contacts:write", rateLimiter) },
     async (request) => {
       const data = await repository.updateContact(
         request.apiPrincipal!.companyId,
@@ -77,7 +79,7 @@ export function registerContactMutationRoutes(
 
   app.delete<{ Params: { id: string } }>(
     "/api/v1/contacts/:id",
-    { preHandler: protect(apiKeys, "contacts:write") },
+    { preHandler: protect(apiKeys, "contacts:write", rateLimiter) },
     async (request) => {
       const data = await repository.archiveContact(
         request.apiPrincipal!.companyId,
@@ -90,7 +92,7 @@ export function registerContactMutationRoutes(
 
   app.post<{ Params: { id: string } }>(
     "/api/v1/contacts/:id/notes",
-    { preHandler: protect(apiKeys, "notes:write") },
+    { preHandler: protect(apiKeys, "notes:write", rateLimiter) },
     async (request, reply) => {
       const input = parse(noteSchema, request.body);
       return withIdempotency(request, reply, idempotency, async () => {
@@ -108,7 +110,7 @@ export function registerContactMutationRoutes(
 
   app.patch<{ Params: { id: string } }>(
     "/api/v1/notes/:id",
-    { preHandler: protect(apiKeys, "notes:write") },
+    { preHandler: protect(apiKeys, "notes:write", rateLimiter) },
     async (request) => {
       const input = parse(noteSchema, request.body);
       const data = await repository.updateNote(
@@ -123,7 +125,7 @@ export function registerContactMutationRoutes(
 
   app.delete<{ Params: { id: string } }>(
     "/api/v1/notes/:id",
-    { preHandler: protect(apiKeys, "notes:write") },
+    { preHandler: protect(apiKeys, "notes:write", rateLimiter) },
     async (request, reply) => {
       const deleted = await repository.deleteNote(
         request.apiPrincipal!.companyId,
@@ -136,7 +138,7 @@ export function registerContactMutationRoutes(
 
   app.put<{ Params: { id: string; tag: string } }>(
     "/api/v1/contacts/:id/tags/:tag",
-    { preHandler: protect(apiKeys, "tags:write") },
+    { preHandler: protect(apiKeys, "tags:write", rateLimiter) },
     async (request) => {
       const tag = z.string().trim().min(1).max(100).parse(request.params.tag);
       const data = await repository.attachTag(
@@ -151,7 +153,7 @@ export function registerContactMutationRoutes(
 
   app.delete<{ Params: { id: string; tag: string } }>(
     "/api/v1/contacts/:id/tags/:tag",
-    { preHandler: protect(apiKeys, "tags:write") },
+    { preHandler: protect(apiKeys, "tags:write", rateLimiter) },
     async (request) => {
       const tag = z.string().trim().min(1).max(100).parse(request.params.tag);
       const data = await repository.detachTag(

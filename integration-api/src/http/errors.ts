@@ -4,7 +4,8 @@ export class ApiError extends Error {
   constructor(
     public readonly statusCode: number,
     public readonly code: string,
-    message: string
+    message: string,
+    public readonly headers: Record<string, string> = {}
   ) {
     super(message);
     this.name = "ApiError";
@@ -24,6 +25,7 @@ export function registerErrorHandlers(app: FastifyInstance): void {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
+      for (const [name, value] of Object.entries(error.headers)) reply.header(name, value);
       return reply.status(error.statusCode).send({
         error: {
           code: error.code,

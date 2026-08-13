@@ -9,6 +9,7 @@ import { assertSafeMediaUrl } from "../delivery/media-url.js";
 import { messageBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 import type { HostResolver } from "../net/destination.js";
 import type { ChannelResource, CoreRepository } from "../resources/core.js";
 
@@ -45,8 +46,8 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   return result.data;
 }
 
-function protect(apiKeys: ApiKeyRepository) {
-  const authenticate = createApiKeyAuthenticator(apiKeys);
+function protect(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
     assertScopes(request.apiPrincipal!.scopes, ["messages:send"]);
@@ -123,9 +124,10 @@ export function registerMessageSendRoutes(
   resources: CoreRepository,
   idempotency: IdempotencyRepository,
   delivery: DeliveryClient,
-  resolveHost?: HostResolver
+  resolveHost?: HostResolver,
+  rateLimiter?: RateLimiter
 ): void {
-  const preHandler = protect(apiKeys);
+  const preHandler = protect(apiKeys, rateLimiter);
   const routeOptions = { bodyLimit: messageBodyLimitBytes, preHandler };
 
   app.post("/api/v1/messages/send", routeOptions, async (request, reply) => {

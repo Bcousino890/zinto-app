@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { ApiError } from "../http/errors.js";
+import { rateLimitError, type RateLimiter } from "../http/rate-limit.js";
 export { assertScopes } from "./scopes.js";
 
 export interface ApiKeyRecord {
@@ -40,7 +41,7 @@ declare module "fastify" {
 
 const bearerPattern = /^Bearer (pcp_[a-f0-9]{64})$/;
 
-export function createApiKeyAuthenticator(repository: ApiKeyRepository) {
+export function createApiKeyAuthenticator(repository: ApiKeyRepository, rateLimiter?: RateLimiter) {
   return async function authenticateApiKey(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     const authorization = request.headers.authorization;
     if (authorization === undefined) {
@@ -65,6 +66,15 @@ export function createApiKeyAuthenticator(repository: ApiKeyRepository) {
     }
     if (record.allowedIps.length > 0 && !record.allowedIps.includes(request.ip)) {
       throw new ApiError(403, "ip_not_allowed", "This IP address is not allowed");
+    }
+
+    // Only counted once the key is fully valid: an invalid or expired key is
+    // already rejected above, and bounded separately by the per-IP bucket.
+    if (rateLimiter !== undefined) {
+      const retryAfterKey = rateLimiter.checkApiKey(record.id);
+      if (retryAfterKey !== null) throw rateLimitError(retryAfterKey);
+      const retryAfterCompany = rateLimiter.checkCompany(record.companyId);
+      if (retryAfterCompany !== null) throw rateLimitError(retryAfterCompany);
     }
 
     request.apiPrincipal = {

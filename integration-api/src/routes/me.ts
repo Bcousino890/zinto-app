@@ -2,11 +2,12 @@ import type { FastifyInstance } from "fastify";
 
 import type { ApiKeyRepository } from "../auth/api-key.js";
 import { createApiKeyAuthenticator } from "../auth/api-key.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 
-export function registerMeRoute(app: FastifyInstance, repository: ApiKeyRepository): void {
+export function registerMeRoute(app: FastifyInstance, repository: ApiKeyRepository, rateLimiter?: RateLimiter): void {
   app.get(
     "/api/v1/me",
-    { preHandler: createApiKeyAuthenticator(repository) },
+    { preHandler: createApiKeyAuthenticator(repository, rateLimiter) },
     async (request) => {
       const principal = request.apiPrincipal!;
       return {

@@ -4,6 +4,7 @@ import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-ke
 import { assertScopes } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
 import { parsePageQuery } from "../http/pagination.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 import type { CoreRepository, ResourcePage } from "../resources/core.js";
 
 function responsePage<T>(requestId: string, page: ResourcePage<T>) {
@@ -17,8 +18,8 @@ function responsePage<T>(requestId: string, page: ResourcePage<T>) {
   };
 }
 
-function protectedHandler(apiKeys: ApiKeyRepository, scopes: string[]) {
-  const authenticate = createApiKeyAuthenticator(apiKeys);
+function protectedHandler(apiKeys: ApiKeyRepository, scopes: string[], rateLimiter?: RateLimiter) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
     assertScopes(request.apiPrincipal!.scopes, scopes);
@@ -28,11 +29,12 @@ function protectedHandler(apiKeys: ApiKeyRepository, scopes: string[]) {
 export function registerCoreRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
-  resources: CoreRepository
+  resources: CoreRepository,
+  rateLimiter?: RateLimiter
 ): void {
   app.get(
     "/api/v1/channels",
-    { preHandler: protectedHandler(apiKeys, ["channels:read"]) },
+    { preHandler: protectedHandler(apiKeys, ["channels:read"], rateLimiter) },
     async (request) => ({
       data: await resources.listChannels(request.apiPrincipal!.companyId),
       meta: { request_id: request.id }
@@ -41,7 +43,7 @@ export function registerCoreRoutes(
 
   app.get(
     "/api/v1/contacts",
-    { preHandler: protectedHandler(apiKeys, ["contacts:read"]) },
+    { preHandler: protectedHandler(apiKeys, ["contacts:read"], rateLimiter) },
     async (request) => responsePage(
       request.id,
       await resources.listContacts(request.apiPrincipal!.companyId, parsePageQuery(request.query))
@@ -50,7 +52,7 @@ export function registerCoreRoutes(
 
   app.get(
     "/api/v1/conversations",
-    { preHandler: protectedHandler(apiKeys, ["conversations:read"]) },
+    { preHandler: protectedHandler(apiKeys, ["conversations:read"], rateLimiter) },
     async (request) => responsePage(
       request.id,
       await resources.listConversations(request.apiPrincipal!.companyId, parsePageQuery(request.query))
@@ -59,7 +61,7 @@ export function registerCoreRoutes(
 
   app.get<{ Params: { id: string } }>(
     "/api/v1/conversations/:id/messages",
-    { preHandler: protectedHandler(apiKeys, ["conversations:read", "messages:read"]) },
+    { preHandler: protectedHandler(apiKeys, ["conversations:read", "messages:read"], rateLimiter) },
     async (request) => {
       if (!/^\d+$/.test(request.params.id)) {
         throw new ApiError(400, "validation_error", "The conversation ID is invalid");

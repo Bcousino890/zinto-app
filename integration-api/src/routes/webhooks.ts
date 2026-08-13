@@ -7,6 +7,7 @@ import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-ke
 import { assertScopes } from "../auth/scopes.js";
 import { webhookBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 import { assertSafeDestination, type HostResolver } from "../net/destination.js";
 import type { WebhookRepository } from "../webhooks/repository.js";
 
@@ -26,8 +27,8 @@ const createSchema = z.object({
   event_types: z.array(z.enum(webhookEventTypes)).min(1).max(webhookEventTypes.length)
 }).strict();
 
-function protect(apiKeys: ApiKeyRepository) {
-  const authenticate = createApiKeyAuthenticator(apiKeys);
+function protect(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
     assertScopes(request.apiPrincipal!.scopes, ["webhooks:manage"]);
@@ -51,9 +52,10 @@ export function registerWebhookRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
   repository: WebhookRepository,
-  resolveHost?: HostResolver
+  resolveHost?: HostResolver,
+  rateLimiter?: RateLimiter
 ): void {
-  const preHandler = protect(apiKeys);
+  const preHandler = protect(apiKeys, rateLimiter);
 
   app.post("/api/v1/webhooks", { bodyLimit: webhookBodyLimitBytes, preHandler }, async (request, reply) => {
     const result = createSchema.safeParse(request.body);

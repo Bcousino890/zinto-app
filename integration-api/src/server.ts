@@ -5,6 +5,7 @@ import { PostgresIdempotencyRepository } from "./db/idempotency.js";
 import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
 import { secureLoggerOptions } from "./http/logging.js";
+import { RateLimiter } from "./http/rate-limit.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
@@ -28,6 +29,12 @@ async function start(): Promise<void> {
       stopWebhookWorker();
       await pool.end();
     },
+    rateLimiter: new RateLimiter({
+      windowMs: config.RATE_LIMIT_WINDOW_MS,
+      perKeyMax: config.RATE_LIMIT_PER_KEY_MAX,
+      perCompanyMax: config.RATE_LIMIT_PER_COMPANY_MAX,
+      perIpMax: config.RATE_LIMIT_PER_IP_MAX
+    }),
     readOnly: config.READ_ONLY_MODE,
     readinessCheck: async () => {
       await pool.query("SELECT 1");
