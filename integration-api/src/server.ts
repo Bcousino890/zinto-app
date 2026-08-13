@@ -10,6 +10,7 @@ import { DownloadingMediaProxy } from "./media/proxy.js";
 import { FilesystemMediaStore } from "./media/store.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
+import { PostgresDeliveryAuditRepository } from "./resources/delivery-audit.js";
 import { PostgresPipelineRepository } from "./resources/pipelines.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
 import { PostgresWebhookDeliveryRepository } from "./webhooks/deliveries.js";
@@ -32,6 +33,7 @@ async function start(): Promise<void> {
     apiKeyRepository: new PostgresApiKeyRepository(pool),
     contactMutationRepository: new PostgresContactMutationRepository(pool),
     coreRepository: new PostgresCoreRepository(pool),
+    deliveryAuditRepository: new PostgresDeliveryAuditRepository(pool),
     deliveryClient: new LegacyDeliveryClient(config.LEGACY_API_URL, config.LEGACY_DELIVERY_TIMEOUT_MS),
     idempotencyRepository: new PostgresIdempotencyRepository(pool),
     logger: secureLoggerOptions(config.LOG_LEVEL),

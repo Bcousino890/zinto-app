@@ -32,6 +32,14 @@ describe("safe deployment configuration", () => {
     expect(loadConfig(required).MEDIA_PROXY_ENABLED).toBe(false);
   });
 
+  it("defaults the legacy delivery timeout to a bounded, reasonable value", () => {
+    const config = loadConfig(required);
+
+    expect(config.LEGACY_DELIVERY_TIMEOUT_MS).toBe(30_000);
+    expect(() => loadConfig({ ...required, LEGACY_DELIVERY_TIMEOUT_MS: "500" })).toThrow();
+    expect(() => loadConfig({ ...required, LEGACY_DELIVERY_TIMEOUT_MS: "999999" })).toThrow();
+  });
+
   it("refuses to enable the media proxy without the address the engine must call", () => {
     expect(() => loadConfig({ ...required, MEDIA_PROXY_ENABLED: "true" })).toThrow();
     expect(loadConfig({
