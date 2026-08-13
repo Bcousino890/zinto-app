@@ -54,6 +54,44 @@ describe("safe deployment configuration", () => {
     }).MEDIA_PROXY_ENABLED).toBe(true);
   });
 
+  it("defaults each media type's byte limit to the real WhatsApp Business API cap for that type", () => {
+    const config = loadConfig(required);
+
+    // Image 5 MB, video 16 MB, audio 16 MB, document 100 MB - see
+    // docs/api/MEDIA-PROXY-2026-08-13.md for why these differ per type
+    // instead of sharing one limit.
+    expect(config.MEDIA_MAX_BYTES_IMAGE).toBe(5_242_880);
+    expect(config.MEDIA_MAX_BYTES_VIDEO).toBe(16_777_216);
+    expect(config.MEDIA_MAX_BYTES_AUDIO).toBe(16_777_216);
+    expect(config.MEDIA_MAX_BYTES_DOCUMENT).toBe(104_857_600);
+  });
+
+  it("allows each media type's byte limit to be tuned independently per deployment", () => {
+    const config = loadConfig({
+      ...required,
+      MEDIA_MAX_BYTES_IMAGE: "2097152",
+      MEDIA_MAX_BYTES_VIDEO: "8388608",
+      MEDIA_MAX_BYTES_AUDIO: "4194304",
+      MEDIA_MAX_BYTES_DOCUMENT: "52428800"
+    });
+
+    expect(config.MEDIA_MAX_BYTES_IMAGE).toBe(2_097_152);
+    expect(config.MEDIA_MAX_BYTES_VIDEO).toBe(8_388_608);
+    expect(config.MEDIA_MAX_BYTES_AUDIO).toBe(4_194_304);
+    expect(config.MEDIA_MAX_BYTES_DOCUMENT).toBe(52_428_800);
+  });
+
+  it("keeps each media byte limit within the same sane bounds the old shared MEDIA_MAX_BYTES enforced", () => {
+    const variables = ["MEDIA_MAX_BYTES_IMAGE", "MEDIA_MAX_BYTES_VIDEO", "MEDIA_MAX_BYTES_AUDIO", "MEDIA_MAX_BYTES_DOCUMENT"] as const;
+
+    for (const name of variables) {
+      expect(() => loadConfig({ ...required, [name]: "1023" })).toThrow();
+      expect(loadConfig({ ...required, [name]: "1024" })[name]).toBe(1024);
+      expect(loadConfig({ ...required, [name]: "104857600" })[name]).toBe(104_857_600);
+      expect(() => loadConfig({ ...required, [name]: "104857601" })).toThrow();
+    }
+  });
+
   it("defaults rate limiting to the documented, conservative values", () => {
     const config = loadConfig(required);
 
