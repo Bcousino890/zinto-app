@@ -58,6 +58,8 @@ describe("OpenAPI partner contract", () => {
       "DELETE /api/v1/webhooks/{id}",
       "GET /api/v1/channels",
       "GET /api/v1/contacts",
+      "GET /api/v1/contacts/{id}",
+      "GET /api/v1/contacts/{id}/notes",
       "GET /api/v1/conversations",
       "GET /api/v1/conversations/{id}/messages",
       "GET /api/v1/deals",

@@ -136,6 +136,20 @@ paths:
   /api/v1/contacts/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Contacts]
+      operationId: getContact
+      summary: Fetch one contact owned by the company
+      responses:
+        "200":
+          description: Contact
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContactResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Contacts]
       operationId: updateContact
@@ -172,6 +186,31 @@ paths:
   /api/v1/contacts/{id}/notes:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Contacts]
+      operationId: listContactNotes
+      summary: List notes for a contact with cursor pagination
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+      responses:
+        "200":
+          description: Note page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PageResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Note" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       tags: [Contacts]
       operationId: createContactNote

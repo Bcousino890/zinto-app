@@ -28,6 +28,7 @@ mediante parametros del cliente.
 | `conversations:read` | Leer conversaciones |
 | `messages:read` | Leer el historial de mensajes |
 | `messages:send` | Enviar mensajes por canales compatibles |
+| `notes:read` | Listar notas de un contacto |
 | `notes:write` | Crear, editar y borrar notas |
 | `tags:write` | Asociar y quitar etiquetas |
 | `webhooks:manage` | Registrar, listar y desactivar webhooks |

@@ -29,6 +29,51 @@ const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 const page = { cursor: null, limit: 50, updatedSince: null };
 
 describe("core read repository", () => {
+  it("finds one contact only inside its company", async () => {
+    const { pool, resources } = repository([{ rows: [{
+      id: 103,
+      name: "Contacto tres",
+      email: null,
+      phone: "+34600000103",
+      avatar_url: null,
+      company: null,
+      tags: null,
+      source: "whatsapp",
+      notes: null,
+      custom_fields: null,
+      is_archived: false,
+      created_at: new Date("2026-08-13T10:00:00.000Z"),
+      updated_at: new Date("2026-08-13T10:00:00.000Z")
+    }] }]);
+
+    const result = await resources.findContact(12, 103);
+
+    expect(pool.calls[0]!.params).toEqual([103, 12]);
+    expect(pool.calls[0]!.text).toContain("company_id = $2");
+    expect(result?.id).toBe("103");
+  });
+
+  it("lists notes through contacts so note IDs cannot cross tenants", async () => {
+    const { pool, resources } = repository([{ rows: [{ exists: true }] }, { rows: [{
+      id: 44,
+      contact_id: 103,
+      created_by_id: 4,
+      content: "Seguimiento",
+      created_at: new Date("2026-08-13T10:00:00.000Z"),
+      updated_at: new Date("2026-08-13T10:00:00.000Z")
+    }] }]);
+
+    const result = await resources.listNotes(12, 103, { ...page, updatedSince: "2026-08-12T00:00:00.000Z" });
+
+    expect(pool.calls[0]!.params).toEqual([103, 12]);
+    expect(pool.calls[1]!.params).toEqual([103, 12, "2026-08-12T00:00:00.000Z", null, null, 51]);
+    expect(pool.calls[1]!.text).toContain("notes.contact_id = $1");
+    expect(pool.calls[1]!.text).toContain("contacts.company_id = $2");
+    expect(pool.calls[1]!.text).toContain("contacts.deleted_at IS NULL");
+    expect(pool.calls[1]!.text).toContain("notes.updated_at >= $3::timestamp");
+    expect(result?.items[0]).toMatchObject({ id: "44", contact_id: "103", content: "Seguimiento" });
+  });
+
   it("filters contacts strictly by company and asks for one extra row", async () => {
     const { pool, resources } = repository([{
       rows: [{

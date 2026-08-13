@@ -93,6 +93,39 @@ export function registerCoreRoutes(
     )
   );
 
+  app.get<{ Params: { id: string } }>(
+    "/api/v1/contacts/:id",
+    { preHandler: protectedHandler(apiKeys, ["contacts:read"], rateLimiter) },
+    async (request) => {
+      if (resources.findContact === undefined) {
+        throw new ApiError(501, "not_implemented", "Individual contact reads are unavailable");
+      }
+      const data = await resources.findContact(
+        request.apiPrincipal!.companyId,
+        identifier(request.params.id, "contact")
+      );
+      if (data === null) throw new ApiError(404, "contact_not_found", "The contact was not found");
+      return { data, meta: { request_id: request.id } };
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/v1/contacts/:id/notes",
+    { preHandler: protectedHandler(apiKeys, ["contacts:read", "notes:read"], rateLimiter) },
+    async (request) => {
+      if (resources.listNotes === undefined) {
+        throw new ApiError(501, "not_implemented", "Contact note reads are unavailable");
+      }
+      const page = await resources.listNotes(
+        request.apiPrincipal!.companyId,
+        identifier(request.params.id, "contact"),
+        parseIncrementalQuery(request.query)
+      );
+      if (page === null) throw new ApiError(404, "contact_not_found", "The contact was not found");
+      return responsePage(request.id, page);
+    }
+  );
+
   app.get(
     "/api/v1/conversations",
     { preHandler: protectedHandler(apiKeys, ["conversations:read"], rateLimiter) },

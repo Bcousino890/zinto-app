@@ -80,9 +80,20 @@ export interface MessageResource {
   created_at: string;
 }
 
+export interface NoteResource {
+  id: string;
+  contact_id: string;
+  created_by_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CoreRepository {
   listChannels(companyId: number): Promise<ChannelResource[]>;
   listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>>;
+  findContact?(companyId: number, contactId: number): Promise<ContactResource | null>;
+  listNotes?(companyId: number, contactId: number, query: IncrementalQuery): Promise<ResourcePage<NoteResource> | null>;
   listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>>;
   /**
    * `query.updatedSince` on messages is answered against `created_at`, not a
@@ -289,6 +300,53 @@ export class PostgresCoreRepository implements CoreRepository {
       archived: row.is_archived,
       created_at: iso(row.created_at)!,
       updated_at: iso(row.updated_at)!
+    })), query.limit);
+  }
+
+  async findContact(companyId: number, contactId: number): Promise<ContactResource | null> {
+    const result = await this.pool.query<ContactRow>(
+      `SELECT id, name, email, phone, avatar_url, company, tags, source, notes,
+              custom_fields, is_archived, created_at, updated_at
+         FROM contacts
+        WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [contactId, companyId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    return {
+      id: String(row.id), name: row.name, email: row.email, phone: row.phone,
+      avatar_url: row.avatar_url, company: row.company, tags: row.tags ?? [],
+      source: row.source, notes: row.notes, custom_fields: row.custom_fields ?? {},
+      archived: row.is_archived, created_at: iso(row.created_at)!, updated_at: iso(row.updated_at)!
+    };
+  }
+
+  async listNotes(companyId: number, contactId: number, query: IncrementalQuery): Promise<ResourcePage<NoteResource> | null> {
+    const contact = await this.pool.query<{ exists: boolean }>(
+      "SELECT EXISTS(SELECT 1 FROM contacts WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL) AS exists",
+      [contactId, companyId]
+    );
+    if (contact.rows[0]?.exists !== true) return null;
+    const [cursorDate, cursorId] = cursorParameters(query);
+    const result = await this.pool.query<{
+      id: number; contact_id: number; created_by_id: number; content: string;
+      created_at: Timestamp; updated_at: Timestamp;
+    }>(
+      `SELECT notes.id, notes.contact_id, notes.created_by_id, notes.content,
+              notes.created_at, notes.updated_at
+         FROM notes
+         JOIN contacts ON contacts.id = notes.contact_id
+         WHERE notes.contact_id = $1 AND contacts.company_id = $2
+          AND contacts.deleted_at IS NULL
+          AND ($3::timestamp IS NULL OR notes.updated_at >= $3::timestamp)
+          AND ($4::timestamp IS NULL OR (notes.created_at, notes.id) < ($4::timestamp, $5::integer))
+        ORDER BY notes.created_at DESC, notes.id DESC
+        LIMIT $6`,
+      [contactId, companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
+    );
+    return paged(result.rows.map((row) => ({
+      id: String(row.id), contact_id: String(row.contact_id), created_by_id: String(row.created_by_id),
+      content: row.content, created_at: iso(row.created_at)!, updated_at: iso(row.updated_at)!
     })), query.limit);
   }
 
