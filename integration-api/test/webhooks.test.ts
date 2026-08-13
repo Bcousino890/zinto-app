@@ -77,6 +77,7 @@ async function makeApp() {
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeys(),
     logger: false,
+    readOnly: false,
     webhookRepository: repository
   });
   apps.push(app);

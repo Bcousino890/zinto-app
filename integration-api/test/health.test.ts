@@ -46,6 +46,42 @@ describe("service health contract", () => {
     });
   });
 
+  it("reports readiness only when its dependency check succeeds", async () => {
+    const healthy = await buildApp({ logger: false, readinessCheck: async () => undefined });
+    const unhealthy = await buildApp({
+      logger: false,
+      readinessCheck: async () => {
+        throw new Error("database unavailable");
+      }
+    });
+    apps.push(healthy, unhealthy);
+
+    const ready = await healthy.inject({ method: "GET", url: "/ready" });
+    const unavailable = await unhealthy.inject({ method: "GET", url: "/ready" });
+
+    expect(ready.statusCode).toBe(200);
+    expect(ready.json().data.status).toBe("ready");
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.json()).toEqual({
+      error: {
+        code: "service_not_ready",
+        message: "A required service is unavailable",
+        request_id: unavailable.headers["x-request-id"]
+      }
+    });
+  });
+
+  it("blocks every API mutation while read-only mode is enabled", async () => {
+    const app = await buildApp({ logger: false });
+    apps.push(app);
+
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
+      const response = await app.inject({ method, url: "/api/v1/contacts/1" });
+      expect(response.statusCode).toBe(503);
+      expect(response.json().error.code).toBe("read_only_mode");
+    }
+  });
+
   it("closes owned dependencies when the application stops", async () => {
     let closed = false;
     const app = await buildApp({

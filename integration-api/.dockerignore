@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+docs
+examples
+migrations
+openapi
+test
+deploy
+

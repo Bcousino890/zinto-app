@@ -34,6 +34,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /ready:
+    get:
+      tags: [System]
+      operationId: getReadiness
+      security: []
+      summary: Check service dependencies
+      responses:
+        "200":
+          description: Service and database are ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: A required service is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/me:
     get:
       tags: [Identity]
@@ -485,7 +504,7 @@ components:
           required: [service, status, version]
           properties:
             service: { const: zinto-integration-api }
-            status: { const: ok }
+            status: { type: string, enum: [ok, ready] }
             version: { type: string }
         meta: { $ref: "#/components/schemas/RequestMeta" }
     IdentityResponse:

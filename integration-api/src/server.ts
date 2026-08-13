@@ -30,14 +30,20 @@ async function start(): Promise<void> {
       stopWebhookWorker();
       await pool.end();
     },
+    readOnly: config.READ_ONLY_MODE,
+    readinessCheck: async () => {
+      await pool.query("SELECT 1");
+    },
     trustProxy: config.TRUST_PROXY,
     webhookRepository: new PostgresWebhookRepository(pool, webhookCipher)
   });
-  stopWebhookWorker = startWebhookWorker(
-    new PostgresWebhookDeliveryRepository(pool, webhookCipher),
-    1000,
-    (error) => app.log.error({ err: error }, "webhook worker iteration failed")
-  );
+  if (config.WEBHOOK_WORKER_ENABLED) {
+    stopWebhookWorker = startWebhookWorker(
+      new PostgresWebhookDeliveryRepository(pool, webhookCipher),
+      1000,
+      (error) => app.log.error({ err: error }, "webhook worker iteration failed")
+    );
+  }
 
   try {
     await app.listen({ host: config.HOST, port: config.PORT });

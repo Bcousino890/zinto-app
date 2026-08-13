@@ -33,6 +33,7 @@ describe("OpenAPI partner contract", () => {
       "GET /api/v1/me",
       "GET /api/v1/webhooks",
       "GET /health",
+      "GET /ready",
       "PATCH /api/v1/contacts/{id}",
       "PATCH /api/v1/notes/{id}",
       "POST /api/v1/contacts",

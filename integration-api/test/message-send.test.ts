@@ -103,7 +103,8 @@ async function makeApp() {
     coreRepository: new MemoryCore(),
     deliveryClient: delivery,
     idempotencyRepository: new MemoryIdempotency(),
-    logger: false
+    logger: false,
+    readOnly: false
   });
   apps.push(app);
   return { app, delivery };

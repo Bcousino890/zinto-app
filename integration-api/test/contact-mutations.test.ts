@@ -202,7 +202,8 @@ async function makeApp(options: { contactCreateDelayMs?: number } = {}) {
     apiKeyRepository: new MemoryApiKeyRepository(),
     contactMutationRepository: contacts,
     idempotencyRepository: idempotency,
-    logger: false
+    logger: false,
+    readOnly: false
   });
   apps.push(app);
   return { app, contacts, idempotency };

@@ -1,0 +1,39 @@
+services:
+  integration-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: zinto-integration-api:0.1.0
+    container_name: zinto-integration-api-preview
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      READ_ONLY_MODE: "true"
+      WEBHOOK_WORKER_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - powerchat-shared-network
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3100/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  powerchat-shared-network:
+    external: true
+
