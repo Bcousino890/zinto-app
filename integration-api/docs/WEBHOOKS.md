@@ -90,3 +90,10 @@ tag agregado o quitado en esa misma sentencia. Actualizar tres tags en un solo
 
 En ambos casos, procesa cada evento de forma idempotente por `id` en vez de
 asumir una correspondencia 1:1 con la operacion que los origino.
+### Recuperacion de entregas
+
+Las entregas reclamadas tienen un token de lease. Si un worker muere, otra
+instancia puede reclamar una entrega cuyo lease haya expirado; el worker
+anterior no puede sobrescribir el resultado porque sus actualizaciones exigen
+el token vigente. La migracion `003_webhook_lease_tokens.sql` debe aplicarse
+antes de desplegar esta version.

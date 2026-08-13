@@ -4,6 +4,7 @@ import type { WebhookSecretCipher } from "./cipher.js";
 
 export interface ClaimedWebhookDelivery {
   id: string;
+  leaseToken?: string;
   eventId: string;
   eventType: string;
   attemptCount: number;
@@ -15,9 +16,9 @@ export interface ClaimedWebhookDelivery {
 
 export interface WebhookDeliveryRepository {
   claimBatch(limit: number): Promise<ClaimedWebhookDelivery[]>;
-  markDelivered(id: string): Promise<void>;
-  markRetry(id: string, nextAttemptAt: Date, error: string): Promise<void>;
-  markDead(id: string): Promise<void>;
+  markDelivered(id: string, leaseToken?: string): Promise<void>;
+  markRetry(id: string, nextAttemptAt: Date, error: string, leaseToken?: string): Promise<void>;
+  markDead(id: string, leaseToken?: string): Promise<void>;
 }
 
 interface DeliveryRow {
@@ -29,6 +30,7 @@ interface DeliveryRow {
   payload: unknown;
   encrypted_secret: string;
   url: string;
+  lease_token: string | null;
 }
 
 export class PostgresWebhookDeliveryRepository implements WebhookDeliveryRepository {
@@ -89,7 +91,8 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
         `WITH claimed AS (
            SELECT deliveries.id
              FROM integration_api_webhook_deliveries deliveries
-            WHERE deliveries.status IN ('pending', 'retrying')
+            WHERE (deliveries.status IN ('pending', 'retrying')
+               OR (deliveries.status = 'leased' AND deliveries.lease_expires_at < NOW()))
               AND deliveries.next_attempt_at <= NOW()
               AND (deliveries.lease_expires_at IS NULL OR deliveries.lease_expires_at < NOW())
             ORDER BY deliveries.id
@@ -97,18 +100,21 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
             LIMIT $1
          )
          UPDATE integration_api_webhook_deliveries deliveries
-            SET status = 'leased', lease_expires_at = NOW() + INTERVAL '2 minutes',
+            SET status = 'leased', lease_token = md5(random()::text || clock_timestamp()::text),
+                lease_expires_at = NOW() + INTERVAL '2 minutes',
                 attempt_count = attempt_count + 1, updated_at = NOW()
            FROM claimed, integration_api_outbox outbox, integration_api_webhook_endpoints endpoints
           WHERE deliveries.id = claimed.id AND outbox.id = deliveries.outbox_id
             AND endpoints.id = deliveries.endpoint_id
          RETURNING deliveries.id, outbox.event_id, outbox.event_type, deliveries.attempt_count,
-                   outbox.occurred_at, outbox.payload, endpoints.encrypted_secret, endpoints.url`,
+                   outbox.occurred_at, outbox.payload, endpoints.encrypted_secret, endpoints.url,
+                   deliveries.lease_token`,
         [limit]
       );
       await client.query("COMMIT");
       return result.rows.map((row) => ({
         id: String(row.id),
+        leaseToken: row.lease_token ?? undefined,
         eventId: String(row.event_id),
         eventType: row.event_type,
         attemptCount: row.attempt_count,
@@ -125,31 +131,31 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
     }
   }
 
-  async markDelivered(id: string): Promise<void> {
+  async markDelivered(id: string, leaseToken?: string): Promise<void> {
     await this.pool.query(
       `UPDATE integration_api_webhook_deliveries
-          SET status = 'delivered', delivered_at = NOW(), lease_expires_at = NULL, updated_at = NOW()
-        WHERE id = $1`,
-      [id]
+          SET status = 'delivered', delivered_at = NOW(), lease_expires_at = NULL, lease_token = NULL, updated_at = NOW()
+        WHERE id = $1 AND status = 'leased' AND lease_token = $2`,
+      [id, leaseToken]
     );
   }
 
-  async markRetry(id: string, nextAttemptAt: Date, error: string): Promise<void> {
+  async markRetry(id: string, nextAttemptAt: Date, error: string, leaseToken?: string): Promise<void> {
     await this.pool.query(
       `UPDATE integration_api_webhook_deliveries
           SET status = 'retrying', next_attempt_at = $2, error_message = $3,
-              lease_expires_at = NULL, updated_at = NOW()
-        WHERE id = $1`,
-      [id, nextAttemptAt, error.slice(0, 2000)]
+              lease_expires_at = NULL, lease_token = NULL, updated_at = NOW()
+        WHERE id = $1 AND status = 'leased' AND lease_token = $4`,
+      [id, nextAttemptAt, error.slice(0, 2000), leaseToken]
     );
   }
 
-  async markDead(id: string): Promise<void> {
+  async markDead(id: string, leaseToken?: string): Promise<void> {
     await this.pool.query(
       `UPDATE integration_api_webhook_deliveries
-          SET status = 'dead', lease_expires_at = NULL, updated_at = NOW()
-        WHERE id = $1`,
-      [id]
+          SET status = 'dead', lease_expires_at = NULL, lease_token = NULL, updated_at = NOW()
+        WHERE id = $1 AND status = 'leased' AND lease_token = $2`,
+      [id, leaseToken]
     );
   }
 }

@@ -46,17 +46,17 @@ async function deliver(
       signal: AbortSignal.timeout(15_000)
     }));
     if (response.ok) {
-      await repository.markDelivered(item.id);
+      await repository.markDelivered(item.id, item.leaseToken);
       return;
     }
     throw new Error(`HTTP ${response.status}`);
   } catch (error) {
     if (item.attemptCount >= maxAttempts) {
-      await repository.markDead(item.id);
+      await repository.markDead(item.id, item.leaseToken);
       return;
     }
     const message = error instanceof Error ? error.message : "Webhook delivery failed";
-    await repository.markRetry(item.id, calculateNextAttempt(now, item.attemptCount, random()), message);
+    await repository.markRetry(item.id, calculateNextAttempt(now, item.attemptCount, random()), message, item.leaseToken);
   }
 }
 
