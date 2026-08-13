@@ -8,6 +8,7 @@ import { DownloadingMediaProxy } from "./media/proxy.js";
 import { FilesystemMediaStore } from "./media/store.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
+import { PostgresPipelineRepository } from "./resources/pipelines.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
 import { PostgresWebhookDeliveryRepository } from "./webhooks/deliveries.js";
 import { PostgresWebhookRepository } from "./webhooks/repository.js";
@@ -40,6 +41,7 @@ async function start(): Promise<void> {
       timeoutMs: config.LEGACY_DELIVERY_TIMEOUT_MS
     }),
     mediaStore,
+    pipelineRepository: new PostgresPipelineRepository(pool),
     onClose: async () => {
       stopWebhookWorker();
       if (mediaPurge !== undefined) clearInterval(mediaPurge);

@@ -80,9 +80,9 @@ export interface CoreRepository {
   ): Promise<ResourcePage<MessageResource> | null>;
 }
 
-type Timestamp = Date | string | null;
+export type Timestamp = Date | string | null;
 
-function iso(value: Timestamp): string | null {
+export function iso(value: Timestamp): string | null {
   if (value === null) return null;
   return (value instanceof Date ? value : new Date(value)).toISOString();
 }
@@ -105,13 +105,13 @@ function capabilities(channelType: string): string[] {
   }
 }
 
-function cursorParameters(query: PageQuery): [string | null, number | null] {
+export function cursorParameters(query: PageQuery): [string | null, number | null] {
   if (query.cursor === null) return [null, null];
   const cursor = decodeCursor(query.cursor);
   return [cursor.createdAt, Number(cursor.id)];
 }
 
-function paged<T extends { id: string; created_at: string }>(rows: T[], limit: number): ResourcePage<T> {
+export function paged<T extends { id: string; created_at: string }>(rows: T[], limit: number): ResourcePage<T> {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
   const last = items.at(-1);
