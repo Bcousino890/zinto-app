@@ -22,6 +22,7 @@ import { secureLoggerOptions } from "./http/logging.js";
 import { createIpRateLimitHook, defaultRateLimitConfig, RateLimiter } from "./http/rate-limit.js";
 import type { CoreRepository } from "./resources/core.js";
 import type { PipelineMutationRepository } from "./resources/pipeline-mutations.js";
+import type { PipelineCrudRepository } from "./resources/pipeline-crud.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
 import type { TaskMutationRepository } from "./resources/task-mutations.js";
 import { registerCoreRoutes } from "./routes/core.js";
@@ -29,6 +30,7 @@ import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerConversationMutationRoutes } from "./routes/conversation-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
 import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
+import { registerPipelineCrudRoutes } from "./routes/pipeline-crud.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
 import { registerTaskMutationRoutes } from "./routes/task-mutations.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
@@ -50,6 +52,7 @@ export interface AppOptions {
   metricsRegistry?: MetricsRegistry;
   onClose?: () => Promise<void>;
   pipelineMutationRepository?: PipelineMutationRepository;
+  pipelineCrudRepository?: PipelineCrudRepository;
   pipelineRepository?: PipelineRepository;
   taskMutationRepository?: TaskMutationRepository;
   rateLimiter?: RateLimiter;
@@ -163,6 +166,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         rateLimiter,
         writeAccessPolicy
       );
+    }
+    if (options.pipelineCrudRepository !== undefined && options.idempotencyRepository !== undefined) {
+      registerPipelineCrudRoutes(app, options.apiKeyRepository, options.pipelineCrudRepository,
+        options.idempotencyRepository, rateLimiter, writeAccessPolicy);
     }
     if (options.taskMutationRepository !== undefined && options.idempotencyRepository !== undefined) {
       registerTaskMutationRoutes(

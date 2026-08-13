@@ -1,0 +1,30 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
+import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
+import { ApiError } from "../http/errors.js";
+import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { RateLimiter } from "../http/rate-limit.js";
+import type { PipelineCrudRepository, PipelineCreateInput, PipelineUpdateInput, PipelineStageCreateInput, PipelineStageUpdateInput } from "../resources/pipeline-crud.js";
+
+const text = z.string().trim().min(1).max(500);
+const pipelineShape = { name: text.max(255), description: text.nullable().optional(), icon: text.nullable().optional(), color: text.max(50).nullable().optional(), is_default: z.boolean().optional(), is_template: z.boolean().optional(), template_category: text.nullable().optional(), order_num: z.number().int().min(0).max(2147483647).optional() };
+const createPipeline = z.object(pipelineShape).strict().required({ name: true });
+const updatePipeline = z.object(pipelineShape).strict().refine((v) => Object.keys(v).length > 0);
+const stageShape = { name: text.max(255), color: text.max(50), order_num: z.number().int().min(0).max(2147483647).default(0) };
+const createStage = z.object(stageShape).strict().required({ name: true, color: true });
+const updateStage = z.object(stageShape).partial().strict().refine((v) => Object.keys(v).length > 0);
+function parse<T>(schema: z.ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid"); return result.data; }
+function id(value: string, resource: string): number { if (!/^\d+$/.test(value)) throw new ApiError(400, "validation_error", `The ${resource} ID is invalid`); const parsed = Number(value); if (!Number.isSafeInteger(parsed) || parsed < 1) throw new ApiError(400, "validation_error", `The ${resource} ID is invalid`); return parsed; }
+function protect(keys: ApiKeyRepository, limiter: RateLimiter, policy: WriteAccessPolicy) { const authenticate = createApiKeyAuthenticator(keys, limiter); return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => { await authenticate(request, reply); if (allowsAnyWrite(policy)) assertWriteEnabled(policy, request.apiPrincipal!); assertScopes(request.apiPrincipal!.scopes, ["pipelines:write"]); }; }
+
+export function registerPipelineCrudRoutes(app: FastifyInstance, keys: ApiKeyRepository, repo: PipelineCrudRepository, idem: IdempotencyRepository, limiter: RateLimiter, policy: WriteAccessPolicy): void {
+  const preHandler = protect(keys, limiter, policy);
+  app.post("/api/v1/pipelines", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => ({ statusCode: 201, body: { data: await repo.createPipeline(request.apiPrincipal!.companyId, request.apiPrincipal!.userId, parse<PipelineCreateInput>(createPipeline, request.body)), meta: { request_id: request.id } } })));
+  app.patch<{ Params: { id: string } }>("/api/v1/pipelines/:id", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const data = await repo.updatePipeline(request.apiPrincipal!.companyId, id(request.params.id, "pipeline"), parse<PipelineUpdateInput>(updatePipeline, request.body)); if (data === null) throw new ApiError(404, "pipeline_not_found", "The pipeline was not found"); return { statusCode: 200, body: { data, meta: { request_id: request.id } } }; }));
+  app.delete<{ Params: { id: string } }>("/api/v1/pipelines/:id", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const result = await repo.deletePipeline(request.apiPrincipal!.companyId, id(request.params.id, "pipeline")); if (!result.ok) throw new ApiError(result.reason === "pipeline_in_use" ? 409 : 404, result.reason, result.reason === "pipeline_in_use" ? "The pipeline still has deals" : "The pipeline was not found"); return { statusCode: 200, body: { data: result.pipeline, meta: { request_id: request.id } } }; }));
+  app.post<{ Params: { id: string } }>("/api/v1/pipelines/:id/stages", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const data = await repo.createStage(request.apiPrincipal!.companyId, request.apiPrincipal!.userId, id(request.params.id, "pipeline"), parse<PipelineStageCreateInput>(createStage, request.body)); if (data === null) throw new ApiError(404, "pipeline_not_found", "The pipeline was not found"); return { statusCode: 201, body: { data, meta: { request_id: request.id } } }; }));
+  app.patch<{ Params: { id: string; stageId: string } }>("/api/v1/pipelines/:id/stages/:stageId", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const data = await repo.updateStage(request.apiPrincipal!.companyId, id(request.params.id, "pipeline"), id(request.params.stageId, "stage"), parse<PipelineStageUpdateInput>(updateStage, request.body)); if (data === null) throw new ApiError(404, "pipeline_stage_not_found", "The pipeline stage was not found"); return { statusCode: 200, body: { data, meta: { request_id: request.id } } }; }));
+  app.delete<{ Params: { id: string; stageId: string } }>("/api/v1/pipelines/:id/stages/:stageId", { preHandler }, async (request, reply) => withIdempotency(request, reply, idem, async () => { const result = await repo.deleteStage(request.apiPrincipal!.companyId, id(request.params.id, "pipeline"), id(request.params.stageId, "stage")); if (!result.ok) throw new ApiError(result.reason === "stage_in_use" ? 409 : 404, result.reason === "pipeline_not_found" ? "pipeline_not_found" : result.reason, result.reason === "stage_in_use" ? "The pipeline stage still has deals" : "The pipeline stage was not found"); return { statusCode: 200, body: { data: result.stage, meta: { request_id: request.id } } }; }));
+}

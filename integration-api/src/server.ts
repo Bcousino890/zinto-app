@@ -15,6 +15,7 @@ import { PostgresContactMutationRepository } from "./resources/contact-mutations
 import { PostgresConversationMutationRepository } from "./resources/conversation-mutations.js";
 import { PostgresDeliveryAuditRepository } from "./resources/delivery-audit.js";
 import { PostgresPipelineMutationRepository } from "./resources/pipeline-mutations.js";
+import { PostgresPipelineCrudRepository } from "./resources/pipeline-crud.js";
 import { PostgresPipelineRepository } from "./resources/pipelines.js";
 import { PostgresTaskMutationRepository } from "./resources/task-mutations.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
@@ -61,6 +62,7 @@ async function start(): Promise<void> {
     metricsQueries,
     metricsRegistry,
     pipelineMutationRepository: new PostgresPipelineMutationRepository(pool),
+    pipelineCrudRepository: new PostgresPipelineCrudRepository(pool),
     pipelineRepository: new PostgresPipelineRepository(pool),
     taskMutationRepository: new PostgresTaskMutationRepository(pool),
     onClose: async () => {

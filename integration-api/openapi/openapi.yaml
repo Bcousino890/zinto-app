@@ -300,6 +300,37 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/pipelines:
+    post:
+      tags: [Pipelines]
+      operationId: createPipeline
+      summary: Create a pipeline
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                description: { type: [string, "null"], maxLength: 500 }
+                icon: { type: [string, "null"], maxLength: 500 }
+                color: { type: [string, "null"], maxLength: 50 }
+                is_default: { type: boolean }
+                is_template: { type: boolean }
+                template_category: { type: [string, "null"], maxLength: 500 }
+                order_num: { type: integer, minimum: 0 }
+      responses:
+        "201": { description: Pipeline created }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     get:
       tags: [Pipelines]
       operationId: listPipelines
@@ -352,6 +383,132 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Pipelines]
+      operationId: createPipelineStage
+      summary: Create a pipeline stage
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, color]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                color: { type: string, minLength: 1, maxLength: 50 }
+                order_num: { type: integer, minimum: 0 }
+      responses:
+        "201": { description: Pipeline stage created }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/pipelines/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    patch:
+      tags: [Pipelines]
+      operationId: updatePipeline
+      summary: Update a pipeline
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                description: { type: [string, "null"], maxLength: 500 }
+                icon: { type: [string, "null"], maxLength: 500 }
+                color: { type: [string, "null"], maxLength: 50 }
+                is_default: { type: boolean }
+                is_template: { type: boolean }
+                template_category: { type: [string, "null"], maxLength: 500 }
+                order_num: { type: integer, minimum: 0 }
+      responses:
+        "200": { description: Pipeline updated }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+    delete:
+      tags: [Pipelines]
+      operationId: deletePipeline
+      summary: Delete an unused pipeline
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { description: Pipeline deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/pipelines/{id}/stages/{stageId}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+      - name: stageId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^\d+$' }
+    patch:
+      tags: [Pipelines]
+      operationId: updatePipelineStage
+      summary: Update a pipeline stage
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                color: { type: string, minLength: 1, maxLength: 50 }
+                order_num: { type: integer, minimum: 0 }
+      responses:
+        "200": { description: Pipeline stage updated }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+    delete:
+      tags: [Pipelines]
+      operationId: deletePipelineStage
+      summary: Delete an unused pipeline stage
+      description: Requires `pipelines:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { description: Pipeline stage deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/deals:
     get:
       tags: [Deals]
