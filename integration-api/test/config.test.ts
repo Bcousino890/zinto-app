@@ -72,4 +72,34 @@ describe("safe deployment configuration", () => {
     expect(config.RATE_LIMIT_PER_COMPANY_MAX).toBe(150);
     expect(config.RATE_LIMIT_PER_IP_MAX).toBe(80);
   });
+
+  it("defaults the bookkeeping-table retention windows to a grace period longer than the outbox window", () => {
+    const config = loadConfig(required);
+
+    expect(config.IDEMPOTENCY_RETENTION_HOURS).toBe(24);
+    expect(config.OUTBOX_RETENTION_DAYS).toBe(7);
+    expect(config.WEBHOOK_DELIVERY_RETENTION_DAYS).toBe(30);
+    // Delivery history is meant to outlive the raw outbox events that produced it.
+    expect(config.WEBHOOK_DELIVERY_RETENTION_DAYS).toBeGreaterThan(config.OUTBOX_RETENTION_DAYS);
+  });
+
+  it("allows the retention windows to be tuned per deployment within sane bounds", () => {
+    const config = loadConfig({
+      ...required,
+      IDEMPOTENCY_RETENTION_HOURS: "48",
+      OUTBOX_RETENTION_DAYS: "14",
+      WEBHOOK_DELIVERY_RETENTION_DAYS: "60"
+    });
+
+    expect(config.IDEMPOTENCY_RETENTION_HOURS).toBe(48);
+    expect(config.OUTBOX_RETENTION_DAYS).toBe(14);
+    expect(config.WEBHOOK_DELIVERY_RETENTION_DAYS).toBe(60);
+
+    expect(() => loadConfig({ ...required, IDEMPOTENCY_RETENTION_HOURS: "0" })).toThrow();
+    expect(() => loadConfig({ ...required, IDEMPOTENCY_RETENTION_HOURS: "169" })).toThrow();
+    expect(() => loadConfig({ ...required, OUTBOX_RETENTION_DAYS: "0" })).toThrow();
+    expect(() => loadConfig({ ...required, OUTBOX_RETENTION_DAYS: "91" })).toThrow();
+    expect(() => loadConfig({ ...required, WEBHOOK_DELIVERY_RETENTION_DAYS: "0" })).toThrow();
+    expect(() => loadConfig({ ...required, WEBHOOK_DELIVERY_RETENTION_DAYS: "181" })).toThrow();
+  });
 });
