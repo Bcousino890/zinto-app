@@ -4,8 +4,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { loadConfig } from "../src/config.js";
 import { ApiError } from "../src/http/errors.js";
-import { fetchRemoteMedia } from "../src/media/fetch.js";
+import { fetchRemoteMedia, type MediaKind } from "../src/media/fetch.js";
+import { DownloadingMediaProxy, type MediaSizeLimits } from "../src/media/proxy.js";
 import { FilesystemMediaStore } from "../src/media/store.js";
 
 const policy = {
@@ -209,13 +211,12 @@ describe("the engine never receives the partner URL", () => {
       },
       logger: false,
       mediaProxy: new DownloadingMediaProxy(store, {
-        maxBytes: 4096,
         timeoutMs: 5000,
         fetch: async () => new Response(new Uint8Array([5, 6, 7]), {
           status: 200,
           headers: { "content-type": "image/png" }
         })
-      }),
+      }, { image: 4096, video: 4096, audio: 4096, document: 4096 }),
       mediaStore: store,
       readOnly: false
     } as never);
@@ -258,5 +259,122 @@ describe("media errors are canonical", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).statusCode).toBe(400);
+  });
+});
+
+const requiredMediaConfig = {
+  DATABASE_URL: "postgres://zinto:test@db:5432/zinto",
+  LEGACY_API_URL: "http://legacy:9000",
+  WEBHOOK_ENCRYPTION_KEY: "a".repeat(64)
+};
+
+function defaultMaxBytesByKind(): MediaSizeLimits {
+  const config = loadConfig(requiredMediaConfig);
+  return {
+    image: config.MEDIA_MAX_BYTES_IMAGE,
+    video: config.MEDIA_MAX_BYTES_VIDEO,
+    audio: config.MEDIA_MAX_BYTES_AUDIO,
+    document: config.MEDIA_MAX_BYTES_DOCUMENT
+  };
+}
+
+async function makeLimitsStore(): Promise<FilesystemMediaStore> {
+  const directory = await mkdtemp(join(tmpdir(), "zinto-media-limits-"));
+  return new FilesystemMediaStore(directory, "http://zinto-integration-api:3100");
+}
+
+function respondWithBytes(byteLength: number, contentType: string): () => Promise<Response> {
+  return async () => new Response(new Uint8Array(byteLength), { status: 200, headers: { "content-type": contentType } });
+}
+
+const storedMediaUrl = /^http:\/\/zinto-integration-api:3100\/internal\/media\/[a-f0-9]{64}$/;
+
+describe("media size limits are applied per media type", () => {
+  it("defaults to the real WhatsApp Business API limits: image 5 MB, video/audio 16 MB, document 100 MB", () => {
+    const limits = defaultMaxBytesByKind();
+
+    expect(limits.image).toBe(5_242_880);
+    expect(limits.video).toBe(16_777_216);
+    expect(limits.audio).toBe(16_777_216);
+    expect(limits.document).toBe(104_857_600);
+  });
+
+  it("rejects a 6 MB image but accepts the identical 6 MB payload sent as a document", async () => {
+    const store = await makeLimitsStore();
+    const sixMb = 6 * 1024 * 1024;
+    const maxBytesByKind = defaultMaxBytesByKind();
+
+    const imageProxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: respondWithBytes(sixMb, "image/jpeg")
+    }, maxBytesByKind);
+    await expect(imageProxy.prepare("https://cdn.partner.example/a.jpg", "image"))
+      .rejects.toMatchObject({ code: "media_too_large" });
+
+    const documentProxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: respondWithBytes(sixMb, "application/pdf")
+    }, maxBytesByKind);
+    await expect(documentProxy.prepare("https://cdn.partner.example/a.pdf", "document"))
+      .resolves.toMatch(storedMediaUrl);
+  });
+
+  it("accepts a 90 MB document, which is under the 100 MB document default", async () => {
+    const store = await makeLimitsStore();
+    const proxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: respondWithBytes(90 * 1024 * 1024, "application/pdf")
+    }, defaultMaxBytesByKind());
+
+    await expect(proxy.prepare("https://cdn.partner.example/big.pdf", "document")).resolves.toMatch(storedMediaUrl);
+  });
+
+  it("rejects a video over its own 16 MB default, well under what the document cap would allow", async () => {
+    const store = await makeLimitsStore();
+    const proxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: respondWithBytes(17 * 1024 * 1024, "video/mp4")
+    }, defaultMaxBytesByKind());
+
+    await expect(proxy.prepare("https://cdn.partner.example/clip.mp4", "video"))
+      .rejects.toMatchObject({ code: "media_too_large" });
+  });
+
+  it("keeps the declared content-length check working, selecting the limit for the type in the same request", async () => {
+    const store = await makeLimitsStore();
+    const limits = defaultMaxBytesByKind();
+    // One byte over the image limit, but still comfortably under the document limit.
+    const declaredLength = limits.image + 1;
+
+    const imageProxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: async () => new Response(new Uint8Array([1]), {
+        status: 200,
+        headers: { "content-type": "image/png", "content-length": String(declaredLength) }
+      })
+    }, limits);
+    await expect(imageProxy.prepare("https://cdn.partner.example/f.png", "image"))
+      .rejects.toMatchObject({ code: "media_too_large" });
+
+    const documentProxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: async () => new Response(new Uint8Array([1]), {
+        status: 200,
+        headers: { "content-type": "application/pdf", "content-length": String(declaredLength) }
+      })
+    }, limits);
+    await expect(documentProxy.prepare("https://cdn.partner.example/f.pdf", "document")).resolves.toMatch(storedMediaUrl);
+  });
+
+  it("still rejects on real received bytes over the per-type limit when no content-length is declared", async () => {
+    const store = await makeLimitsStore();
+    const limits = defaultMaxBytesByKind();
+    const proxy = new DownloadingMediaProxy(store, {
+      timeoutMs: 5000,
+      fetch: respondWithBytes(limits.audio + 1, "audio/mpeg")
+    }, limits);
+
+    await expect(proxy.prepare("https://cdn.partner.example/clip.mp3", "audio"))
+      .rejects.toMatchObject({ code: "media_too_large" });
   });
 });

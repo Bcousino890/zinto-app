@@ -13,7 +13,22 @@ const configSchema = z.object({
     .transform((value) => value === "true"),
   MEDIA_STORAGE_DIR: z.string().min(1).default("/var/lib/zinto-media"),
   MEDIA_INTERNAL_BASE_URL: z.string().url().optional(),
-  MEDIA_MAX_BYTES: z.coerce.number().int().min(1024).max(104_857_600).default(16_777_216),
+  // Replaces the old single MEDIA_MAX_BYTES: WhatsApp Business API caps media
+  // size differently per kind (the legacy engine's whatsapp_official/
+  // whatsapp_meta channels serve those limits directly, and
+  // whatsapp_unofficial/Baileys tracks them closely enough that splitting by
+  // kind still applies there) - image 5 MB, video 16 MB, audio 16 MB,
+  // document 100 MB. A single shared cap forced a bad trade-off: either
+  // reject valid documents above 16 MB, or raise the shared cap and accept
+  // absurdly large images. Each variable keeps the same bounds the old
+  // MEDIA_MAX_BYTES had (min 1 KiB, max 100 MiB) so a deployment can still
+  // tune them without disabling the sanity check - that per-variable max is
+  // also the absolute safety ceiling, so there is no separate "backup" limit
+  // to fall out of sync with these four.
+  MEDIA_MAX_BYTES_IMAGE: z.coerce.number().int().min(1024).max(104_857_600).default(5_242_880),
+  MEDIA_MAX_BYTES_VIDEO: z.coerce.number().int().min(1024).max(104_857_600).default(16_777_216),
+  MEDIA_MAX_BYTES_AUDIO: z.coerce.number().int().min(1024).max(104_857_600).default(16_777_216),
+  MEDIA_MAX_BYTES_DOCUMENT: z.coerce.number().int().min(1024).max(104_857_600).default(104_857_600),
   MEDIA_RETENTION_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
   // Serves GET /internal/metrics (Prometheus text format: request latency and
   // response counts per route from an in-memory registry, plus outbox lag /

@@ -49,8 +49,12 @@ async function start(): Promise<void> {
     idempotencyRepository: new PostgresIdempotencyRepository(pool),
     logger: secureLoggerOptions(config.LOG_LEVEL),
     mediaProxy: mediaStore === undefined ? undefined : new DownloadingMediaProxy(mediaStore, {
-      maxBytes: config.MEDIA_MAX_BYTES,
       timeoutMs: config.LEGACY_DELIVERY_TIMEOUT_MS
+    }, {
+      image: config.MEDIA_MAX_BYTES_IMAGE,
+      video: config.MEDIA_MAX_BYTES_VIDEO,
+      audio: config.MEDIA_MAX_BYTES_AUDIO,
+      document: config.MEDIA_MAX_BYTES_DOCUMENT
     }),
     mediaStore,
     metricsQueries,
