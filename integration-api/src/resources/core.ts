@@ -90,8 +90,12 @@ function iso(value: Timestamp): string | null {
 function capabilities(channelType: string): string[] {
   switch (channelType) {
     case "whatsapp":
-    case "meta_whatsapp":
+    case "whatsapp_unofficial":
+      return ["text", "media"];
+    case "whatsapp_official":
       return ["text", "media", "template", "interactive"];
+    case "whatsapp_meta":
+      return ["text", "media"];
     case "email":
       return ["text", "html", "attachments"];
     case "twilio_voice":

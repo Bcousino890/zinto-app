@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 
 import type { ApiKeyRepository } from "./auth/api-key.js";
+import type { DeliveryClient } from "./delivery/client.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import { registerErrorHandlers } from "./http/errors.js";
@@ -10,11 +11,13 @@ import type { CoreRepository } from "./resources/core.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
+import { registerMessageSendRoutes } from "./routes/message-send.js";
 
 export interface AppOptions {
   apiKeyRepository?: ApiKeyRepository;
   contactMutationRepository?: ContactMutationRepository;
   coreRepository?: CoreRepository;
+  deliveryClient?: DeliveryClient;
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
@@ -55,6 +58,16 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.apiKeyRepository,
         options.contactMutationRepository,
         options.idempotencyRepository
+      );
+    }
+    if (options.coreRepository !== undefined && options.idempotencyRepository !== undefined &&
+        options.deliveryClient !== undefined) {
+      registerMessageSendRoutes(
+        app,
+        options.apiKeyRepository,
+        options.coreRepository,
+        options.idempotencyRepository,
+        options.deliveryClient
       );
     }
   }
