@@ -31,10 +31,18 @@ revisar el contrato. La nueva API si se esta creando con fuente completo.
 - CRM bueno: contenedor `powerchat-app-bcousinoprop`, puerto 9000.
 - PostgreSQL bueno: `powerchat-postgres-bcousinoprop`, PostgreSQL 16.
 - Red Docker compartida: `powerchat-shared-network`.
-- Nginx: `crm.zinto.app` envia `/` a `127.0.0.1:3001` y
-  `/api/webhooks/` a `127.0.0.1:4001`.
+- El dominio lo sirve aaPanel con el maestro
+  `/www/server/nginx/sbin/nginx -c /www/server/nginx/conf/nginx.conf`.
+- Vhost activo: `/www/server/panel/vhost/nginx/crm.zinto.app.conf`; su
+  `location ^~ /` envia el CRM a `127.0.0.1:9000`.
+- aaPanel incluye automaticamente
+  `/www/server/panel/vhost/nginx/extension/crm.zinto.app/*.conf`.
+- No usar `/etc/nginx` para este dominio: corresponde a una configuracion
+  secundaria y no es el maestro que atiende el trafico publico.
 - Preview de la API: contenedor `zinto-integration-api-preview`, localhost
   3100, prefijo `/_integration-api/`.
+- Snippet activo del preview:
+  `/www/server/panel/vhost/nginx/extension/crm.zinto.app/zinto-integration-api-preview.conf`.
 - No tocar repositorios/codigo `multizap`, GitHub antiguo ni `empresa01` para
   esta tarea. La fuente de verdad funcional es bcousinoprop/Zinto.
 
@@ -62,6 +70,22 @@ Implementado y probado:
 - ejemplos TypeScript en `integration-api/examples/`.
 - modo `READ_ONLY_MODE=true` y worker apagado por defecto.
 - Docker/Nginx de preview con doble bloqueo de escrituras.
+
+Estado de publicacion comprobado el 13 de agosto de 2026:
+
+- `GET https://crm.zinto.app/_integration-api/health` -> `200` JSON.
+- `GET https://crm.zinto.app/_integration-api/ready` -> `200` JSON y DB lista.
+- `GET .../api/v1/me` sin clave -> `401 missing_api_key`.
+- `POST .../api/v1/contacts` -> `403` en Nginx.
+- `GET https://crm.zinto.app/inbox` -> `200`; CRM original operativo.
+- contenedor con filesystem read-only, usuario `node`, sin capacidades y
+  puerto publicado solo en `127.0.0.1:3100`.
+- migracion `001_integration_api.sql` NO aplicada y worker NO iniciado.
+
+Consecuencia: no pruebes `GET /api/v1/webhooks` en este preview hasta aplicar la
+migracion en una fase controlada, porque sus tablas aun no existen. Las lecturas
+de recursos legacy pueden probarse con una clave autorizada; todas las
+mutaciones siguen deliberadamente deshabilitadas.
 
 Commits relevantes hasta el relevo:
 
@@ -341,6 +365,10 @@ tambien con rollback; eso no sustituye staging ni backup restaurable.
 5. Registrar commit exacto con `git rev-parse HEAD`.
 6. Comprobar que VPS y GitHub usan ese mismo commit mediante un archivo de
    release o label de imagen; no asumir por nombre de imagen.
+7. Para validar/reload de Nginx usar exactamente:
+   `/www/server/nginx/sbin/nginx -t -c /www/server/nginx/conf/nginx.conf` y
+   `kill -HUP $(pgrep -o nginx)`. El comando `nginx -s reload` de `/etc/nginx`
+   no controla el maestro de aaPanel.
 
 ### Fase B: seguridad bloqueante
 
