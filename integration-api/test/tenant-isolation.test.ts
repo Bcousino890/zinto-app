@@ -21,8 +21,8 @@ import type {
   ContactResource,
   ConversationResource,
   CoreRepository,
+  IncrementalQuery,
   MessageResource,
-  PageQuery,
   ResourcePage
 } from "../src/resources/core.js";
 import type {
@@ -208,7 +208,7 @@ class MemoryCore implements CoreRepository {
   async listConversations(companyId: number): Promise<ResourcePage<ConversationResource>> {
     return companyId === OWNER ? empty<ConversationResource>() : empty<ConversationResource>();
   }
-  async listMessages(companyId: number, conversationId: number, _query: PageQuery) {
+  async listMessages(companyId: number, conversationId: number, _query: IncrementalQuery) {
     // Conversation 700 exists, but only for company 77.
     if (conversationId !== 700 || companyId !== OWNER) return null;
     return empty<MessageResource>();

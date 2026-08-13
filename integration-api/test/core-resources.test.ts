@@ -10,8 +10,8 @@ import type {
   ContactResource,
   ConversationResource,
   CoreRepository,
+  IncrementalQuery,
   MessageResource,
-  PageQuery,
   ResourcePage
 } from "../src/resources/core.js";
 
@@ -168,8 +168,19 @@ const messages: Array<MessageResource & { companyId: number }> = [
   }
 ];
 
-function page<T extends { id: string; created_at: string }>(items: T[], query: PageQuery): ResourcePage<T> {
-  const tenantItems = [...items].sort((a, b) =>
+/**
+ * `updated_since` es un filtro independiente del cursor: se aplica antes de
+ * paginar y nunca cambia el orden por `created_at`, igual que en el
+ * repositorio Postgres real.
+ */
+function page<T extends { id: string; created_at: string; updated_at?: string }>(
+  items: T[],
+  query: IncrementalQuery
+): ResourcePage<T> {
+  const eligible = query.updatedSince === null
+    ? items
+    : items.filter((item) => (item.updated_at ?? item.created_at) >= query.updatedSince!);
+  const tenantItems = [...eligible].sort((a, b) =>
     b.created_at.localeCompare(a.created_at) || Number(b.id) - Number(a.id)
   );
   const cursor = query.cursor === null ? null : decodeCursor(query.cursor);
@@ -195,7 +206,7 @@ class MemoryCoreRepository implements CoreRepository {
       : [];
   }
 
-  async listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>> {
+  async listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>> {
     const result = page(contacts.filter((item) => item.companyId === companyId), query);
     return {
       ...result,
@@ -203,14 +214,14 @@ class MemoryCoreRepository implements CoreRepository {
     };
   }
 
-  async listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>> {
+  async listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>> {
     return page(conversations.filter((item) => item.companyId === companyId), query);
   }
 
   async listMessages(
     companyId: number,
     conversationId: number,
-    query: PageQuery
+    query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null> {
     const conversation = conversations.find(
       (item) => item.companyId === companyId && item.id === String(conversationId)
@@ -302,11 +313,64 @@ describe("core resource API", () => {
     expect(response.json().error.code).toBe("conversation_not_found");
   });
 
+  it("filters contacts by updated_since without disturbing the created_at cursor order", async () => {
+    const app = await makeApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/contacts?updated_since=2026-08-12T00:00:00.000Z",
+      headers: authorization
+    });
+
+    expect(response.statusCode).toBe(200);
+    // Contacto uno (101) fue actualizado el 11 de agosto: queda fuera del filtro,
+    // pero el orden de los que si califican sigue siendo por created_at DESC.
+    expect(response.json().data.map((item: { id: string }) => item.id)).toEqual(["103", "102"]);
+  });
+
+  it("returns the same page when updated_since is absent, unchanged from before this feature", async () => {
+    const app = await makeApp();
+    const first = await app.inject({
+      method: "GET",
+      url: "/api/v1/contacts",
+      headers: authorization
+    });
+    const second = await app.inject({
+      method: "GET",
+      url: "/api/v1/contacts",
+      headers: authorization
+    });
+
+    expect(first.json().data).toEqual(second.json().data);
+    expect(first.json().meta.has_more).toEqual(second.json().meta.has_more);
+    expect(first.json().meta.next_cursor).toEqual(second.json().meta.next_cursor);
+    expect(first.json().data.map((item: { id: string }) => item.id)).toEqual(["103", "102", "101"]);
+  });
+
+  it("accepts updated_since on conversations and on conversation messages without rejecting the request", async () => {
+    const app = await makeApp();
+    const conversationsResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/conversations?updated_since=2026-08-01T00:00:00.000Z",
+      headers: authorization
+    });
+    const messagesResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/conversations/501/messages?updated_since=2026-08-01T00:00:00.000Z",
+      headers: authorization
+    });
+
+    expect(conversationsResponse.statusCode).toBe(200);
+    expect(messagesResponse.statusCode).toBe(200);
+  });
+
   it.each([
     "/api/v1/contacts?limit=0",
     "/api/v1/contacts?limit=201",
     "/api/v1/contacts?cursor=not-a-cursor",
-    "/api/v1/contacts?unknown=true"
+    "/api/v1/contacts?unknown=true",
+    "/api/v1/contacts?updated_since=not-a-date",
+    "/api/v1/conversations?updated_since=not-a-date",
+    "/api/v1/conversations/501/messages?updated_since=not-a-date"
   ])("rejects invalid pagination input: %s", async (url) => {
     const app = await makeApp();
     const response = await app.inject({ method: "GET", url, headers: authorization });

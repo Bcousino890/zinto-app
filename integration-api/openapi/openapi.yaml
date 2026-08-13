@@ -93,6 +93,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Contact page
@@ -401,6 +402,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Conversation page
@@ -424,6 +426,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
       responses:
         "200":
           description: Historical message page, newest first

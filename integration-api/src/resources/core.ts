@@ -7,6 +7,17 @@ export interface PageQuery {
   limit: number;
 }
 
+/**
+ * `updatedSince` viaja junto al cursor pero es un filtro independiente: el
+ * cursor sigue ordenando/paginando por `created_at`, `updated_since` solo
+ * decide que filas entran. Mismo contrato que `IncrementalQuery` en
+ * `resources/pipelines.ts`, definido aqui por separado para no forzar un
+ * import cruzado entre ambos modulos de recursos.
+ */
+export interface IncrementalQuery extends PageQuery {
+  updatedSince: string | null;
+}
+
 export interface ResourcePage<T> {
   items: T[];
   hasMore: boolean;
@@ -71,12 +82,12 @@ export interface MessageResource {
 
 export interface CoreRepository {
   listChannels(companyId: number): Promise<ChannelResource[]>;
-  listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>>;
-  listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>>;
+  listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>>;
+  listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>>;
   listMessages(
     companyId: number,
     conversationId: number,
-    query: PageQuery
+    query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null>;
 }
 
@@ -199,7 +210,7 @@ export class PostgresCoreRepository implements CoreRepository {
     }));
   }
 
-  async listContacts(companyId: number, query: PageQuery): Promise<ResourcePage<ContactResource>> {
+  async listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>> {
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<ContactRow>(
       `SELECT id, name, email, phone, avatar_url, company, tags, source, notes,
@@ -207,10 +218,11 @@ export class PostgresCoreRepository implements CoreRepository {
          FROM contacts
         WHERE company_id = $1
           AND deleted_at IS NULL
-          AND ($2::timestamp IS NULL OR (created_at, id) < ($2::timestamp, $3::integer))
+          AND ($2::timestamp IS NULL OR updated_at >= $2::timestamp)
+          AND ($3::timestamp IS NULL OR (created_at, id) < ($3::timestamp, $4::integer))
         ORDER BY created_at DESC, id DESC
-        LIMIT $4`,
-      [companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $5`,
+      [companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
     return paged(result.rows.map((row) => ({
       id: String(row.id),
@@ -229,17 +241,18 @@ export class PostgresCoreRepository implements CoreRepository {
     })), query.limit);
   }
 
-  async listConversations(companyId: number, query: PageQuery): Promise<ResourcePage<ConversationResource>> {
+  async listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>> {
     const [cursorDate, cursorId] = cursorParameters(query);
     const result = await this.pool.query<ConversationRow>(
       `SELECT id, contact_id, channel_id, channel_type, status, assigned_to_user_id,
               last_message_at, unread_count, bot_disabled, is_archived, created_at, updated_at
          FROM conversations
         WHERE company_id = $1
-          AND ($2::timestamp IS NULL OR (created_at, id) < ($2::timestamp, $3::integer))
+          AND ($2::timestamp IS NULL OR updated_at >= $2::timestamp)
+          AND ($3::timestamp IS NULL OR (created_at, id) < ($3::timestamp, $4::integer))
         ORDER BY created_at DESC, id DESC
-        LIMIT $4`,
-      [companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $5`,
+      [companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
     return paged(result.rows.map((row) => ({
       id: String(row.id),
@@ -260,7 +273,7 @@ export class PostgresCoreRepository implements CoreRepository {
   async listMessages(
     companyId: number,
     conversationId: number,
-    query: PageQuery
+    query: IncrementalQuery
   ): Promise<ResourcePage<MessageResource> | null> {
     const conversation = await this.pool.query<{ exists: boolean }>(
       "SELECT EXISTS(SELECT 1 FROM conversations WHERE id = $1 AND company_id = $2) AS exists",
@@ -278,10 +291,11 @@ export class PostgresCoreRepository implements CoreRepository {
          JOIN conversations ON conversations.id = messages.conversation_id
         WHERE messages.conversation_id = $1
           AND conversations.company_id = $2
-          AND ($3::timestamp IS NULL OR (messages.created_at, messages.id) < ($3::timestamp, $4::integer))
+          AND ($3::timestamp IS NULL OR messages.updated_at >= $3::timestamp)
+          AND ($4::timestamp IS NULL OR (messages.created_at, messages.id) < ($4::timestamp, $5::integer))
         ORDER BY messages.created_at DESC, messages.id DESC
-        LIMIT $5`,
-      [conversationId, companyId, cursorDate, cursorId, query.limit + 1]
+        LIMIT $6`,
+      [conversationId, companyId, query.updatedSince, cursorDate, cursorId, query.limit + 1]
     );
     return paged(result.rows.map((row) => ({
       id: String(row.id),
