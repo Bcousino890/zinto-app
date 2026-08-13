@@ -172,11 +172,12 @@ export class PostgresPipelineMutationRepository implements PipelineMutationRepos
       if (row === undefined) return { ok: false, reason: "deal_not_found" };
 
       // `deal_activities` es una tabla heredada del CRM: no la crea ni la migra
-      // este proyecto. RIESGO ABIERTO: la auditoria solo documento estas seis
-      // columnas, asi que este INSERT las asume suficientes. Si el esquema real
-      // tuviera otra columna NOT NULL sin valor por defecto, este INSERT
-      // fallaria en produccion. Verificar contra el esquema real antes de
-      // habilitar escrituras (no se pudo comprobar: sin acceso a la base).
+      // este proyecto. Esquema real verificado en staging aislado (solo
+      // lectura, ver docs/api/SCHEMA-VERIFICATION-2026-08-13-02.md seccion 1):
+      // exactamente estas seis columnas, sin ningun NOT NULL adicional; `id` y
+      // `created_at` tienen DEFAULT y `metadata` es nullable. El riesgo que
+      // documentaba este comentario (columna NOT NULL no contemplada) queda
+      // cerrado.
       await client.query(
         `INSERT INTO deal_activities (deal_id, user_id, type, content, metadata, created_at)
          VALUES ($1, $2, 'stage_change', 'Deal moved to ' || $3 || ' stage', $4::jsonb, now())`,
