@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
-import type { DeliveryClient, DeliveryRequest } from "../delivery/client.js";
+import type { DeliveryClient, DeliveryRequest, DeliveryResult } from "../delivery/client.js";
 import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
 import { messageBodyLimitBytes } from "../http/body-limits.js";
@@ -13,6 +13,7 @@ import type { RateLimiter } from "../http/rate-limit.js";
 import type { MediaProxy } from "../media/proxy.js";
 import type { HostResolver } from "../net/destination.js";
 import type { ChannelResource, CoreRepository } from "../resources/core.js";
+import type { DeliveryAuditRepository } from "../resources/delivery-audit.js";
 
 const common = {
   channel_id: z.string().regex(/^\d+$/),
@@ -74,20 +75,73 @@ function ensureCapability(resource: ChannelResource, capability: string): void {
   }
 }
 
+/**
+ * Best-effort: `delivery.deliver()` has already resolved successfully by the
+ * time this runs, so the send is real regardless of what happens here. A
+ * failure to write our own audit trail must never turn an already-successful
+ * send into a failed response for the partner - it is only logged.
+ *
+ * This does not, and cannot, fix `messages.sender_id` in the legacy CRM (see
+ * docs/api/LEGACY-ENGINE-AUDIT-2026-08-13.md and
+ * docs/api/DELIVERY-ADAPTER-AUDIT-2026-08-13.md); it only means our own
+ * `integration_api_audit_records` knows the real actor even while the CRM UI
+ * does not.
+ */
+async function recordDeliveryAudit(
+  request: FastifyRequest,
+  deliveryAudit: DeliveryAuditRepository | undefined,
+  payload: DeliveryRequest,
+  result: DeliveryResult
+): Promise<void> {
+  if (deliveryAudit === undefined) return;
+  try {
+    await deliveryAudit.record({
+      companyId: request.apiPrincipal!.companyId,
+      actorUserId: request.apiPrincipal!.userId,
+      action: "message.sent",
+      resourceType: "message",
+      resourceId: result.id,
+      payload: {
+        channel_id: String(payload.channelId),
+        to: payload.to,
+        kind: payload.kind,
+        status: result.status,
+        external_id: result.external_id,
+        conversation_id: result.conversation_id
+      }
+    });
+  } catch (error) {
+    request.log.warn({ err: error }, "failed to record the delivery audit entry");
+  }
+}
+
 async function performDelivery(
   request: FastifyRequest,
   reply: FastifyReply,
   idempotency: IdempotencyRepository,
   delivery: DeliveryClient,
-  payload: DeliveryRequest
+  payload: DeliveryRequest,
+  deliveryAudit?: DeliveryAuditRepository
 ) {
   return withIdempotency<unknown>(request, reply, idempotency, async () => {
     try {
       const data = await delivery.deliver(payload);
+      await recordDeliveryAudit(request, deliveryAudit, payload, data);
       return { statusCode: 201, body: { data, meta: { request_id: request.id } } };
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError" ||
-          error instanceof Error && error.name === "TimeoutError") {
+          error instanceof Error && error.name === "TimeoutError" ||
+          // Any other fetch-level failure (refused connection, DNS failure,
+          // reset mid-response, ...) that reaches here is one the adapter did
+          // not already retry away (see isPreConnectFailure in
+          // src/delivery/client.ts) or could not prove was safe to retry.
+          // Node's fetch reports all of these uniformly as `TypeError: fetch
+          // failed`; treating it as an unknown-outcome timeout is the
+          // conservative choice - it may sometimes be more certain than that
+          // (e.g. two refused connections in a row genuinely never reached
+          // the engine), but never less safe than what "unknown" already
+          // tells a partner not to do.
+          error instanceof TypeError && error.message === "fetch failed") {
         return {
           statusCode: 504,
           body: {
@@ -103,12 +157,20 @@ async function performDelivery(
         // Only the status code is logged: `error.response` is the raw legacy
         // payload, which can carry customer phone numbers or message content.
         request.log.warn({ statusCode: error.statusCode }, "legacy delivery engine rejected the message");
+        // The legacy engine answering with its own 4xx means the request
+        // shape or content was rejected, not that the engine is unavailable;
+        // retrying the identical request will not help. This only changes
+        // `error.code` - the HTTP status stays 502 for both branches so nothing
+        // that keys retry behavior off the status code observes a change.
+        const invalidRequest = error.statusCode >= 400 && error.statusCode < 500;
         return {
           statusCode: 502,
           body: {
             error: {
-              code: "delivery_failed",
-              message: "The delivery engine rejected the message",
+              code: invalidRequest ? "delivery_rejected" : "delivery_failed",
+              message: invalidRequest
+                ? "The delivery engine rejected the request as invalid; retrying it unchanged will not help"
+                : "The delivery engine rejected the message",
               request_id: request.id
             }
           }
@@ -127,7 +189,11 @@ export function registerMessageSendRoutes(
   delivery: DeliveryClient,
   resolveHost?: HostResolver,
   mediaProxy?: MediaProxy,
-  rateLimiter?: RateLimiter
+  rateLimiter?: RateLimiter,
+  // Optional and last on purpose: undefined preserves today's behavior
+  // exactly (no audit write attempted), matching how contactMutationRepository
+  // is wired as an opt-in dependency in src/app.ts.
+  deliveryAudit?: DeliveryAuditRepository
 ): void {
   const preHandler = protect(apiKeys, rateLimiter);
   const routeOptions = { bodyLimit: messageBodyLimitBytes, preHandler };
@@ -142,7 +208,7 @@ export function registerMessageSendRoutes(
       channelId: Number(input.channel_id),
       to: input.to,
       message: input.message
-    });
+    }, deliveryAudit);
   });
 
   app.post("/api/v1/messages/send-media", routeOptions, async (request, reply) => {
@@ -167,7 +233,7 @@ export function registerMessageSendRoutes(
       mediaUrl,
       caption: input.caption,
       filename: input.filename
-    });
+    }, deliveryAudit);
   });
 
   app.post("/api/v1/messages/send-template", routeOptions, async (request, reply) => {
@@ -182,7 +248,7 @@ export function registerMessageSendRoutes(
       templateName: input.template_name,
       templateLanguage: input.template_language,
       components: input.components
-    });
+    }, deliveryAudit);
   });
 
   app.post("/api/v1/messages/send-interactive", routeOptions, async (request, reply) => {
@@ -199,6 +265,6 @@ export function registerMessageSendRoutes(
       header: input.header,
       footer: input.footer,
       action: input.action
-    });
+    }, deliveryAudit);
   });
 }

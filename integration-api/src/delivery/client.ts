@@ -77,20 +77,62 @@ export class DeliveryAdapterError extends Error {
   }
 }
 
+/**
+ * Node's global `fetch` (undici) reports every failure that happens before an
+ * HTTP response exists - refused connection, failed DNS lookup, TLS failure,
+ * etc. - as `TypeError: fetch failed` with the real cause on `error.cause`.
+ * Verified directly against this Node runtime (connecting to a closed port
+ * and to an unresolvable host) rather than assumed.
+ */
+const PRECONNECT_FAILURE_CODES = new Set(["ECONNREFUSED", "ENOTFOUND"]);
+
+function isPreConnectFailure(error: unknown): boolean {
+  if (!(error instanceof TypeError) || error.message !== "fetch failed") return false;
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause === null || typeof cause !== "object" || !("code" in cause)) return false;
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === "string" && PRECONNECT_FAILURE_CODES.has(code);
+}
+
 export class LegacyDeliveryClient implements DeliveryClient {
   constructor(private readonly baseUrl: string, private readonly timeoutMs: number) {}
 
   async deliver(request: DeliveryRequest): Promise<DeliveryResult> {
     const { path, body } = legacyPayload(request);
-    const response = await fetch(new URL(path, this.baseUrl), {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${request.bearerToken}`,
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(this.timeoutMs)
-    });
+    return this.send(path, body, request.bearerToken, true);
+  }
+
+  private async send(
+    path: string,
+    body: Record<string, unknown>,
+    bearerToken: string,
+    allowRetry: boolean
+  ): Promise<DeliveryResult> {
+    let response: Response;
+    try {
+      response = await fetch(new URL(path, this.baseUrl), {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+    } catch (error) {
+      // A refused connection or a DNS lookup that never resolved means not
+      // one byte of this request left the process, so the legacy engine -
+      // and whatever WhatsApp/SMS/etc. account it would have relayed to -
+      // never saw it. That is the one fetch-level failure a single retry
+      // cannot turn into a duplicate real-world send. Anything else (a
+      // timeout, a connection reset after it was established, an error we
+      // don't recognize) is left untouched and propagates as-is, because we
+      // can no longer prove the request never arrived.
+      if (allowRetry && isPreConnectFailure(error)) {
+        return this.send(path, body, bearerToken, false);
+      }
+      throw error;
+    }
     const payload = await response.json().catch(() => ({})) as LegacyResponse;
     if (!response.ok || payload.success !== true || payload.data === undefined) {
       throw new DeliveryAdapterError(response.status, payload);

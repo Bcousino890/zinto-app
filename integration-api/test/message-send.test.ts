@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { ApiKeyRecord, ApiKeyRepository } from "../src/auth/api-key.js";
+import { DeliveryAdapterError } from "../src/delivery/client.js";
 import type { DeliveryClient, DeliveryRequest, DeliveryResult } from "../src/delivery/client.js";
 import type {
   IdempotencyRecord,
@@ -11,6 +12,7 @@ import type {
   IdempotencyScope
 } from "../src/http/idempotency.js";
 import type { ChannelResource, CoreRepository, PageQuery, ResourcePage } from "../src/resources/core.js";
+import type { DeliveryAuditEntry, DeliveryAuditRepository } from "../src/resources/delivery-audit.js";
 
 const rawKey = `pcp_${"d".repeat(64)}`;
 const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
@@ -77,10 +79,21 @@ class MemoryCore implements CoreRepository {
 class RecordingDeliveryClient implements DeliveryClient {
   requests: DeliveryRequest[] = [];
   shouldTimeout = false;
+  /** Simulates the adapter's own `TypeError: fetch failed` for a network-level failure. */
+  shouldFailToConnect = false;
+  rejectWithLegacyStatus: number | null = null;
 
   async deliver(request: DeliveryRequest): Promise<DeliveryResult> {
     this.requests.push(request);
     if (this.shouldTimeout) throw new DOMException("Timed out", "AbortError");
+    if (this.shouldFailToConnect) {
+      throw Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" })
+      });
+    }
+    if (this.rejectWithLegacyStatus !== null) {
+      throw new DeliveryAdapterError(this.rejectWithLegacyStatus, { success: false });
+    }
     return {
       id: "901",
       external_id: "wamid.test",
@@ -92,15 +105,26 @@ class RecordingDeliveryClient implements DeliveryClient {
   }
 }
 
+class MemoryDeliveryAudit implements DeliveryAuditRepository {
+  entries: DeliveryAuditEntry[] = [];
+  shouldFail = false;
+
+  async record(entry: DeliveryAuditEntry): Promise<void> {
+    if (this.shouldFail) throw new Error("audit table unavailable");
+    this.entries.push(entry);
+  }
+}
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-async function makeApp() {
+async function makeApp(options: { deliveryAudit?: DeliveryAuditRepository } = {}) {
   const delivery = new RecordingDeliveryClient();
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeys(),
     coreRepository: new MemoryCore(),
+    deliveryAuditRepository: options.deliveryAudit,
     deliveryClient: delivery,
     hostResolver: async () => ["93.184.216.34"],
     idempotencyRepository: new MemoryIdempotency(),
@@ -247,5 +271,128 @@ describe("message delivery adapter", () => {
     expect(response.statusCode).toBe(504);
     expect(response.json().error.code).toBe("delivery_timeout");
     expect(delivery.requests).toHaveLength(1);
+  });
+
+  it("treats a raw network failure from the adapter as an unknown-outcome timeout, not a generic 500", async () => {
+    // Before this, a fetch-level failure that was not already an AbortError
+    // (refused connection, DNS failure, reset mid-response - anything the
+    // adapter's own retry could not prove was safe) fell through every
+    // recognized branch and surfaced as a generic 500 internal_error,
+    // indistinguishable from a bug in this service.
+    const { app, delivery } = await makeApp();
+    delivery.shouldFailToConnect = true;
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "smartbc-message-network-failure" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    });
+
+    expect(response.statusCode).toBe(504);
+    expect(response.json().error.code).toBe("delivery_timeout");
+  });
+
+  it("distinguishes a legacy 4xx rejection from a legacy 5xx or unknown failure", async () => {
+    const { app, delivery } = await makeApp();
+
+    delivery.rejectWithLegacyStatus = 400;
+    const rejected = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "smartbc-legacy-4xx" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    });
+    expect(rejected.statusCode).toBe(502);
+    expect(rejected.json().error.code).toBe("delivery_rejected");
+
+    delivery.rejectWithLegacyStatus = 500;
+    const failed = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "smartbc-legacy-5xx" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    });
+    expect(failed.statusCode).toBe(502);
+    expect(failed.json().error.code).toBe("delivery_failed");
+  });
+});
+
+describe("delivery audit trail", () => {
+  it("does nothing when no repository is configured, exactly like before this feature existed", async () => {
+    const { app, delivery } = await makeApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "audit-disabled" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(delivery.requests).toHaveLength(1);
+  });
+
+  it("records the real actor behind a successful send when a repository is configured", async () => {
+    const audit = new MemoryDeliveryAudit();
+    const { app } = await makeApp({ deliveryAudit: audit });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "audit-recorded" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola desde SmartBC" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toEqual({
+      companyId: 12,
+      actorUserId: 4,
+      action: "message.sent",
+      resourceType: "message",
+      resourceId: "901",
+      payload: {
+        channel_id: "22",
+        to: "+34606806103",
+        kind: "text",
+        status: "sent",
+        external_id: "wamid.test",
+        conversation_id: "501"
+      }
+    });
+  });
+
+  it("does not record anything, and does not replay a duplicate, when idempotency replays the response", async () => {
+    const audit = new MemoryDeliveryAudit();
+    const { app, delivery } = await makeApp({ deliveryAudit: audit });
+    const request = {
+      method: "POST" as const,
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "audit-replayed" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    };
+
+    await app.inject(request);
+    await app.inject(request);
+
+    expect(delivery.requests).toHaveLength(1);
+    expect(audit.entries).toHaveLength(1);
+  });
+
+  it("still returns 201 to the partner when the audit write itself fails", async () => {
+    // The legacy engine already accepted and is delivering the message by the
+    // time this runs; our own bookkeeping failing must never turn that into a
+    // failed response.
+    const audit = new MemoryDeliveryAudit();
+    audit.shouldFail = true;
+    const { app } = await makeApp({ deliveryAudit: audit });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages/send",
+      headers: { ...baseHeaders, "idempotency-key": "audit-failure-is-not-fatal" },
+      payload: { channel_id: "22", to: "+34606806103", message: "Hola" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().data.id).toBe("901");
+    expect(audit.entries).toHaveLength(0);
   });
 });

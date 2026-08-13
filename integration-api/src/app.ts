@@ -10,6 +10,7 @@ import type { HostResolver } from "./net/destination.js";
 import { registerMediaRoutes } from "./routes/media.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
+import type { DeliveryAuditRepository } from "./resources/delivery-audit.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
 import { globalBodyLimitBytes } from "./http/body-limits.js";
 import { ApiError, registerErrorHandlers } from "./http/errors.js";
@@ -30,6 +31,7 @@ export interface AppOptions {
   apiKeyRepository?: ApiKeyRepository;
   contactMutationRepository?: ContactMutationRepository;
   coreRepository?: CoreRepository;
+  deliveryAuditRepository?: DeliveryAuditRepository;
   deliveryClient?: DeliveryClient;
   hostResolver?: HostResolver;
   idempotencyRepository?: IdempotencyRepository;
@@ -138,7 +140,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.deliveryClient,
         options.hostResolver,
         options.mediaProxy,
-        rateLimiter
+        rateLimiter,
+        options.deliveryAuditRepository
       );
     }
     if (options.webhookRepository !== undefined) {
