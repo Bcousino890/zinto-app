@@ -471,6 +471,75 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Tasks]
+      operationId: createTask
+      summary: Create a task for a company contact
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskCreate" }
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    required: [data, meta]
+                    properties: { meta: { $ref: "#/components/schemas/RequestMeta" } }
+                  - type: object
+                    properties: { data: { $ref: "#/components/schemas/Task" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/tasks/{id}:
+    patch:
+      tags: [Tasks]
+      operationId: updateTask
+      summary: Update a task
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskUpdate" }
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    required: [data, meta]
+                    properties: { meta: { $ref: "#/components/schemas/RequestMeta" } }
+                  - type: object
+                    properties: { data: { $ref: "#/components/schemas/Task" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Tasks]
+      operationId: deleteTask
+      summary: Delete a task
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": { description: Task deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/conversations:
     get:
       tags: [Conversations]
@@ -1028,6 +1097,36 @@ components:
         updated_by_user_id: { type: [string, "null"] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    TaskCreate:
+      type: object
+      required: [contact_id, title]
+      additionalProperties: false
+      properties:
+        contact_id: { type: string, pattern: '^\d+$' }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: [string, "null"], maxLength: 20000 }
+        priority: { type: string, maxLength: 50 }
+        status: { type: string, maxLength: 50 }
+        due_date: { type: [string, "null"], format: date-time }
+        assigned_to: { type: [string, "null"], maxLength: 500 }
+        category: { type: [string, "null"], maxLength: 500 }
+        tags: { type: array, maxItems: 100, items: { type: string, maxLength: 100 } }
+        background_color: { type: [string, "null"], maxLength: 50 }
+    TaskUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: [string, "null"], maxLength: 20000 }
+        priority: { type: string, maxLength: 50 }
+        status: { type: string, maxLength: 50 }
+        due_date: { type: [string, "null"], format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        assigned_to: { type: [string, "null"], maxLength: 500 }
+        category: { type: [string, "null"], maxLength: 500 }
+        tags: { type: array, maxItems: 100, items: { type: string, maxLength: 100 } }
+        background_color: { type: [string, "null"], maxLength: 50 }
     NoteInput:
       type: object
       required: [content]

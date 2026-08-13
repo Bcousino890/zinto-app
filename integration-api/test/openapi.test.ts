@@ -55,6 +55,7 @@ describe("OpenAPI partner contract", () => {
       "DELETE /api/v1/contacts/{id}",
       "DELETE /api/v1/contacts/{id}/tags/{tag}",
       "DELETE /api/v1/notes/{id}",
+      "DELETE /api/v1/tasks/{id}",
       "DELETE /api/v1/webhooks/{id}",
       "GET /api/v1/channels",
       "GET /api/v1/contacts",
@@ -75,6 +76,7 @@ describe("OpenAPI partner contract", () => {
       "PATCH /api/v1/contacts/{id}",
       "PATCH /api/v1/deals/{id}/stage",
       "PATCH /api/v1/notes/{id}",
+      "PATCH /api/v1/tasks/{id}",
       "POST /api/v1/contacts",
       "POST /api/v1/contacts/{id}/notes",
       "POST /api/v1/conversations",
@@ -82,6 +84,7 @@ describe("OpenAPI partner contract", () => {
       "POST /api/v1/messages/send-interactive",
       "POST /api/v1/messages/send-media",
       "POST /api/v1/messages/send-template",
+      "POST /api/v1/tasks",
       "POST /api/v1/webhooks",
       "PUT /api/v1/contacts/{id}/tags/{tag}"
     ]);
