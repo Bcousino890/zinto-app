@@ -8,6 +8,8 @@ import type { MediaProxy } from "./media/proxy.js";
 import type { MediaStore } from "./media/store.js";
 import type { HostResolver } from "./net/destination.js";
 import { registerMediaRoutes } from "./routes/media.js";
+import type { MetricsQueries, MetricsRegistry } from "./http/metrics.js";
+import { registerMetricsRoute } from "./routes/metrics.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import type { ConversationMutationRepository } from "./resources/conversation-mutations.js";
@@ -41,6 +43,8 @@ export interface AppOptions {
   logger?: FastifyServerOptions["logger"];
   mediaProxy?: MediaProxy;
   mediaStore?: MediaStore;
+  metricsQueries?: MetricsQueries;
+  metricsRegistry?: MetricsRegistry;
   onClose?: () => Promise<void>;
   pipelineMutationRepository?: PipelineMutationRepository;
   pipelineRepository?: PipelineRepository;
@@ -74,6 +78,25 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.addHook("onSend", async (request, reply) => {
     reply.header("x-request-id", request.id);
   });
+
+  // Only wired up when a registry is supplied (src/server.ts only builds one
+  // when METRICS_ENABLED is true) so there is zero per-request overhead while
+  // the feature is off, matching the "no cost when disabled" bar the rest of
+  // this file holds optional integrations to.
+  if (options.metricsRegistry !== undefined) {
+    const metricsRegistry = options.metricsRegistry;
+    app.addHook("onResponse", async (request, reply) => {
+      // request.routeOptions.url is the route *pattern* Fastify matched
+      // (e.g. "/api/v1/contacts/:id"), not the literal URL - using the
+      // literal URL here would let one metrics series be created per real
+      // contact/deal/etc id a partner ever requests. It is undefined for
+      // requests that never matched a route (404s), which are collapsed onto
+      // a single fixed label instead of being dropped, so the 404 rate is
+      // still visible.
+      const route = request.routeOptions.url ?? "unmatched_route";
+      metricsRegistry.recordResponse(request.method, route, reply.statusCode, reply.elapsedTime);
+    });
+  }
 
   app.get("/health", async (request) => ({
     data: {
@@ -169,6 +192,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // partner's credentials; the reverse proxy denies the prefix publicly.
   if (options.mediaStore !== undefined) {
     registerMediaRoutes(app, options.mediaStore);
+  }
+  // Requires both: the registry the onResponse hook above fed, and something
+  // that can answer the outbox/webhook queries at scrape time. src/server.ts
+  // only constructs either when METRICS_ENABLED is true, so this route
+  // simply does not exist (404, not a "disabled" error) otherwise - see
+  // docs/api/METRICS-2026-08-13.md.
+  if (options.metricsRegistry !== undefined && options.metricsQueries !== undefined) {
+    registerMetricsRoute(app, options.metricsRegistry, options.metricsQueries);
   }
   if (options.onClose !== undefined) {
     app.addHook("onClose", options.onClose);
