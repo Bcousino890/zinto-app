@@ -212,6 +212,37 @@ Los 3 índices de prueba se destruyeron junto con todo el contenedor de staging 
 
 En producción, dado que estas tablas son actualmente pequeñas (la tabla más grande relevante, `messages`, ocupa 31 MB con 13,577 filas), la creación de estos 3 índices con `CONCURRENTLY` es una operación de **bajo riesgo y segundos de duración**, no una migración pesada.
 
+### 6.4 Actualización (re-verificado, listo como migración 002)
+
+Los 3 índices quedaron preparados como `integration-api/migrations/002_performance_indexes.sql`
+(sin `BEGIN/COMMIT`, porque `CREATE INDEX CONCURRENTLY` no puede correr dentro
+de una transacción explícita). Se re-verificaron en un staging aislado nuevo
+—mismo procedimiento de la sección 7.1, restaurado del mismo backup y
+destruido al terminar— el 13 de agosto de 2026:
+
+| Índice | Tiempo de creación | Tamaño | `indisvalid` |
+|---|---:|---:|---|
+| `idx_contacts_company_created_id_active` | 8.8 ms | 64 kB | `t` |
+| `idx_conversations_company_created_id` | 15.5 ms | 56 kB | `t` |
+| `idx_deals_company_created_id` | 15.0 ms | 40 kB | `t` |
+
+`EXPLAIN (ANALYZE, BUFFERS)` para `company_id=3` (712 contactos, 543
+conversaciones, 407 deals) confirmó el mismo cambio de plan que en 6.2:
+`Seq Scan`+`Sort` → `Index Scan`, con buffers leídos de 42→7 (contacts),
+28→5 (conversations) y 18→9 (deals).
+
+**Esta migración no se aplicó en producción.** Queda lista, verificada y
+documentada para que el propietario la ejecute cuando lo decida:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f integration-api/migrations/002_performance_indexes.sql
+```
+
+Al no llevar transacción, cada `CREATE INDEX CONCURRENTLY` se confirma por
+separado; si una fallara a mitad de camino dejaría un índice `INVALID`
+(instrucciones de verificación y limpieza en el propio archivo), nunca datos
+inconsistentes.
+
 ---
 
 ## 7. Destrucción final del staging

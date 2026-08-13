@@ -60,3 +60,28 @@ duplicados.
 El ejemplo `examples/webhook-receiver.ts` incluye verificacion de firma y
 proteccion basica contra replay.
 
+## Comportamientos multi-evento (por diseno)
+
+Dos casos, confirmados en `docs/api/STAGING-REPORT-2026-08-13.md` seccion 4,
+producen mas de un evento por una sola operacion en el CRM. Ninguno de los dos
+es un error: un consumidor que asuma "una operacion = un evento" se sorprendera
+con ambos, asi que quedan documentados aqui de forma explicita.
+
+**1. Un mensaje entrante puede llegar junto con `conversation.updated`.** La
+tabla `messages` ya tenia, antes de esta integracion, un trigger propio del CRM
+que actualiza `conversations.unread_count` y `last_message_at` cuando llega un
+mensaje con `direction=inbound`. Como el trigger de la Integration API se
+dispara ante cualquier `UPDATE` de `conversations` sin filtrar columnas, cada
+mensaje entrante nuevo genera **dos** eventos en el outbox: `message.created`
+seguido de `conversation.updated`. Los mensajes `outbound` no activan esto,
+porque no tocan `unread_count`.
+
+**2. Un cambio de tags genera un evento extra por cada tag.** Un `UPDATE` de
+`contacts` que modifica el arreglo `tags` (junto con o sin otros campos)
+produce `contact.updated` **mas** un `tag.attached` o `tag.detached` por cada
+tag agregado o quitado en esa misma sentencia. Actualizar tres tags en un solo
+`UPDATE` produce cuatro eventos, no uno.
+
+En ambos casos, procesa cada evento de forma idempotente por `id` en vez de
+asumir una correspondencia 1:1 con la operacion que los origino.
+
