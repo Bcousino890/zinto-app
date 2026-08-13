@@ -186,7 +186,10 @@ describe("core read repository", () => {
     const sql = flat(pool.calls[1]!.text);
     expect(sql).toContain("messages.conversation_id = $1");
     expect(sql).toContain("conversations.company_id = $2");
-    expect(sql).toContain("messages.updated_at >= $3::timestamp");
+    // messages has no updated_at column in the real schema (verified
+    // read-only, see docs/api/SCHEMA-VERIFICATION-2026-08-13-02.md); the
+    // filter is answered against created_at instead.
+    expect(sql).toContain("messages.created_at >= $3::timestamp");
     expect(sql).toContain("(messages.created_at, messages.id) < ($4::timestamp, $5::integer)");
     expect(pool.calls[1]!.params).toEqual([501, 12, "2026-08-11T00:00:00.000Z", null, null, 51]);
     expect(result?.items[0]).toEqual({

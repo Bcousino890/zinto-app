@@ -84,6 +84,19 @@ export interface CoreRepository {
   listChannels(companyId: number): Promise<ChannelResource[]>;
   listContacts(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ContactResource>>;
   listConversations(companyId: number, query: IncrementalQuery): Promise<ResourcePage<ConversationResource>>;
+  /**
+   * `query.updatedSince` on messages is answered against `created_at`, not a
+   * real `updated_at`: the real `messages` table (verified read-only against
+   * a restored production backup, see
+   * docs/api/SCHEMA-VERIFICATION-2026-08-13-02.md) has no `updated_at`
+   * column at all, only `created_at`. So this filter only ever catches
+   * newly-created messages, never a later change to `status`/`read_at` on an
+   * older one - those are already surfaced separately as their own
+   * `message.status.updated` outbox event (see
+   * migrations/001_integration_api.sql). Using `messages.updated_at` here
+   * would fail in production with "column does not exist" the first time a
+   * partner passed `updated_since` on this endpoint.
+   */
   listMessages(
     companyId: number,
     conversationId: number,
@@ -325,7 +338,7 @@ export class PostgresCoreRepository implements CoreRepository {
          FROM ${MESSAGE_SOURCE}
         WHERE messages.conversation_id = $1
           AND conversations.company_id = $2
-          AND ($3::timestamp IS NULL OR messages.updated_at >= $3::timestamp)
+          AND ($3::timestamp IS NULL OR messages.created_at >= $3::timestamp)
           AND ($4::timestamp IS NULL OR (messages.created_at, messages.id) < ($4::timestamp, $5::integer))
         ORDER BY messages.created_at DESC, messages.id DESC
         LIMIT $6`,

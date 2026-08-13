@@ -423,6 +423,12 @@ paths:
       tags: [Conversations]
       operationId: listConversationMessages
       summary: Read complete message history across all dates
+      description: >
+        updated_since is answered against each message's created_at: the
+        underlying table has no separate updated_at column, so this only
+        catches newly created messages, never a later status or read_at
+        change on an older one (those already arrive as their own
+        message.status.updated webhook event).
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
