@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
 import { ApiError } from "../http/errors.js";
 import type { RateLimiter } from "../http/rate-limit.js";
 import type {
@@ -12,10 +13,18 @@ import type {
 
 const stageChangeSchema = z.object({ stage_id: z.string().regex(/^\d+$/) }).strict();
 
-function protect(apiKeys: ApiKeyRepository, scope: string, rateLimiter?: RateLimiter) {
+function protect(
+  apiKeys: ApiKeyRepository,
+  scope: string,
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
+) {
   const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
+    if (writeAccessPolicy !== undefined && allowsAnyWrite(writeAccessPolicy)) {
+      assertWriteEnabled(writeAccessPolicy, request.apiPrincipal!);
+    }
     assertScopes(request.apiPrincipal!.scopes, [scope]);
   };
 }
@@ -52,11 +61,12 @@ export function registerPipelineMutationRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
   repository: PipelineMutationRepository,
-  rateLimiter?: RateLimiter
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
 ): void {
   app.patch<{ Params: { id: string } }>(
     "/api/v1/deals/:id/stage",
-    { preHandler: protect(apiKeys, "deals:write", rateLimiter) },
+    { preHandler: protect(apiKeys, "deals:write", rateLimiter, writeAccessPolicy) },
     async (request) => {
       const dealId = identifier(request.params.id, "deal");
       const parsed = stageChangeSchema.safeParse(request.body);

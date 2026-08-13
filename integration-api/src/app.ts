@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyServerOptions } from "fastify";
 
 import type { ApiKeyRepository } from "./auth/api-key.js";
+import { allowsAnyWrite, type WriteAccessPolicy } from "./auth/write-access.js";
 import type { DeliveryClient } from "./delivery/client.js";
 import type { MediaProxy } from "./media/proxy.js";
 import type { MediaStore } from "./media/store.js";
@@ -53,6 +54,8 @@ export interface AppOptions {
   readinessCheck?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
   webhookRepository?: WebhookRepository;
+  writeEnabledApiKeyIds?: ReadonlySet<number>;
+  writeEnabledCompanyIds?: ReadonlySet<number>;
 }
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
@@ -65,15 +68,24 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.decorateRequest("apiPrincipal", null);
 
   const rateLimiter = options.rateLimiter ?? new RateLimiter(defaultRateLimitConfig);
+  const writeAccessPolicy: WriteAccessPolicy = {
+    enabledApiKeyIds: options.writeEnabledApiKeyIds ?? new Set<number>(),
+    enabledCompanyIds: options.writeEnabledCompanyIds ?? new Set<number>()
+  };
   app.addHook("onRequest", createIpRateLimitHook(rateLimiter));
 
-  app.addHook("onRequest", async (request) => {
-    const readOnly = options.readOnly ?? true;
-    if (readOnly && request.url.startsWith("/api/v1/") &&
-        !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      throw new ApiError(503, "read_only_mode", "Write operations are temporarily disabled");
-    }
-  });
+  const readOnly = options.readOnly ?? true;
+  function isApiMutation(request: FastifyRequest): boolean {
+    return request.url.startsWith("/api/v1/") && !["GET", "HEAD", "OPTIONS"].includes(request.method);
+  }
+
+  if (readOnly && !allowsAnyWrite(writeAccessPolicy)) {
+    app.addHook("onRequest", async (request) => {
+      if (isApiMutation(request)) {
+        throw new ApiError(503, "read_only_mode", "Write operations are temporarily disabled");
+      }
+    });
+  }
 
   app.addHook("onSend", async (request, reply) => {
     reply.header("x-request-id", request.id);
@@ -144,7 +156,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.pipelineMutationRepository,
-        rateLimiter
+        rateLimiter,
+        writeAccessPolicy
       );
     }
     if (options.conversationMutationRepository !== undefined) {
@@ -152,7 +165,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.conversationMutationRepository,
-        rateLimiter
+        rateLimiter,
+        writeAccessPolicy
       );
     }
     if (options.contactMutationRepository !== undefined && options.idempotencyRepository !== undefined) {
@@ -161,7 +175,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.apiKeyRepository,
         options.contactMutationRepository,
         options.idempotencyRepository,
-        rateLimiter
+        rateLimiter,
+        writeAccessPolicy
       );
     }
     if (options.coreRepository !== undefined && options.idempotencyRepository !== undefined &&
@@ -175,7 +190,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.hostResolver,
         options.mediaProxy,
         rateLimiter,
-        options.deliveryAuditRepository
+        options.deliveryAuditRepository,
+        writeAccessPolicy
       );
     }
     if (options.webhookRepository !== undefined) {
@@ -184,7 +200,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.apiKeyRepository,
         options.webhookRepository,
         options.hostResolver,
-        rateLimiter
+        rateLimiter,
+        writeAccessPolicy
       );
     }
   }

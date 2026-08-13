@@ -2,6 +2,17 @@ import { z } from "zod";
 
 import { defaultRateLimitConfig } from "./http/rate-limit.js";
 
+function parseIdAllowlist(raw: string | undefined): number[] {
+  if (raw === undefined || raw.trim() === "") return [];
+  return [...new Set(raw.split(",").map((segment) => {
+    const trimmed = segment.trim();
+    if (!/^\d+$/.test(trimmed)) throw new Error("Write allowlists must contain comma-separated numeric IDs");
+    const value = Number(trimmed);
+    if (value < 1) throw new Error("Write allowlists must contain only positive IDs");
+    return value;
+  }))];
+}
+
 const configSchema = z.object({
   DATABASE_URL: z.string().min(1),
   HOST: z.string().min(1).default("0.0.0.0"),
@@ -76,6 +87,8 @@ const configSchema = z.object({
   RATE_LIMIT_PER_COMPANY_MAX: z.coerce.number().int().min(1).default(defaultRateLimitConfig.perCompanyMax),
   RATE_LIMIT_PER_IP_MAX: z.coerce.number().int().min(1).default(defaultRateLimitConfig.perIpMax),
   READ_ONLY_MODE: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
+  WRITE_ENABLED_API_KEY_IDS: z.string().optional().transform(parseIdAllowlist),
+  WRITE_ENABLED_COMPANY_IDS: z.string().optional().transform(parseIdAllowlist),
   TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   WEBHOOK_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   WEBHOOK_WORKER_ENABLED: z.enum(["true", "false"]).default("false")

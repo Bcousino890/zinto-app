@@ -5,6 +5,12 @@ entrantes, actualizaciones realizadas desde el CRM y cambios generados por la
 API. La URL debe ser HTTPS y no puede apuntar directamente a localhost ni a una
 direccion IP.
 
+Registrar o desactivar webhooks cuenta como escritura. Por eso, si
+`READ_ONLY_MODE=true`, estas operaciones siguen cerradas salvo que la clave API
+o su empresa esten autorizadas explicitamente en la allowlist operativa del
+servidor. `GET /api/v1/webhooks` sigue disponible como lectura normal para
+claves con `webhooks:manage`.
+
 ## Crear un endpoint
 
 ```bash
@@ -84,4 +90,3 @@ tag agregado o quitado en esa misma sentencia. Actualizar tres tags en un solo
 
 En ambos casos, procesa cada evento de forma idempotente por `id` en vez de
 asumir una correspondencia 1:1 con la operacion que los origino.
-

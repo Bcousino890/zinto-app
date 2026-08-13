@@ -195,7 +195,12 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-async function makeApp(options: { contactCreateDelayMs?: number } = {}) {
+async function makeApp(options: {
+  contactCreateDelayMs?: number;
+  readOnly?: boolean;
+  writeEnabledApiKeyIds?: number[];
+  writeEnabledCompanyIds?: number[];
+} = {}) {
   const idempotency = new MemoryIdempotencyRepository();
   const contacts = new MemoryContactMutationRepository(options.contactCreateDelayMs);
   const app = await buildApp({
@@ -203,7 +208,9 @@ async function makeApp(options: { contactCreateDelayMs?: number } = {}) {
     contactMutationRepository: contacts,
     idempotencyRepository: idempotency,
     logger: false,
-    readOnly: false
+    readOnly: options.readOnly ?? false,
+    writeEnabledApiKeyIds: new Set(options.writeEnabledApiKeyIds ?? []),
+    writeEnabledCompanyIds: new Set(options.writeEnabledCompanyIds ?? [])
   });
   apps.push(app);
   return { app, contacts, idempotency };
@@ -221,6 +228,51 @@ describe("contact mutations", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe("idempotency_key_required");
+  });
+
+  it("blocks contact creation in global read-only mode when no allowlist is configured", async () => {
+    const { app } = await makeApp({ readOnly: true });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts",
+      headers: authHeaders,
+      payload: { name: "Ana" }
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe("read_only_mode");
+  });
+
+  it("allows an allowlisted api key to create contacts while global read-only stays enabled", async () => {
+    const { app } = await makeApp({
+      readOnly: true,
+      writeEnabledApiKeyIds: [keyRecord.id]
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts",
+      headers: { ...authHeaders, "idempotency-key": "contact-allowlisted-api-key-001" },
+      payload: { name: "Ana" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().data.name).toBe("Ana");
+  });
+
+  it("allows an allowlisted company to create contacts while global read-only stays enabled", async () => {
+    const { app } = await makeApp({
+      readOnly: true,
+      writeEnabledCompanyIds: [keyRecord.companyId]
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts",
+      headers: { ...authHeaders, "idempotency-key": "contact-allowlisted-company-001" },
+      payload: { name: "Ana" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().data.name).toBe("Ana");
   });
 
   it("creates one contact and replays the same result after a retry", async () => {

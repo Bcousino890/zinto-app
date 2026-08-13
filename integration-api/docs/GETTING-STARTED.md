@@ -39,6 +39,28 @@ Las rutas indicadas en OpenAPI se agregan a esa URL. Por ejemplo:
 GET https://crm.zinto.app/_integration-api/api/v1/me
 ```
 
+## Apertura controlada de escrituras
+
+La API sigue naciendo en modo seguro: `READ_ONLY_MODE=true` bloquea todas las
+mutaciones (`POST`, `PATCH`, `PUT`, `DELETE`) bajo `/api/v1/`.
+
+Ahora existe una excepcion controlada para pilotos o partners autorizados: el
+operador puede habilitar escrituras solo para una lista cerrada de claves API o
+empresas mediante `WRITE_ENABLED_API_KEY_IDS` y/o `WRITE_ENABLED_COMPANY_IDS`.
+Si tu clave no esta en esa allowlist, seguiras recibiendo:
+
+```json
+{
+  "error": {
+    "code": "read_only_mode",
+    "message": "Write operations are temporarily disabled"
+  }
+}
+```
+
+Esto permite abrir un partner concreto sin abrir escrituras globales para el
+resto del sistema.
+
 ## Primera llamada
 
 Solicita una clave API de la empresa en Zinto y guardala como secreto. Las
@@ -85,4 +107,3 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
 - Errores: `docs/ERRORS.md`
 - Cliente Node.js: `examples/node-client.ts`
 - Receptor de webhooks: `examples/webhook-receiver.ts`
-

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
 import { ApiError } from "../http/errors.js";
 import type { RateLimiter } from "../http/rate-limit.js";
 import type {
@@ -19,10 +20,18 @@ const createConversationSchema = z.object({
   channel_id: z.string().regex(/^\d+$/)
 }).strict();
 
-function protect(apiKeys: ApiKeyRepository, scope: string, rateLimiter?: RateLimiter) {
+function protect(
+  apiKeys: ApiKeyRepository,
+  scope: string,
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
+) {
   const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
+    if (writeAccessPolicy !== undefined && allowsAnyWrite(writeAccessPolicy)) {
+      assertWriteEnabled(writeAccessPolicy, request.apiPrincipal!);
+    }
     assertScopes(request.apiPrincipal!.scopes, [scope]);
   };
 }
@@ -44,11 +53,12 @@ export function registerConversationMutationRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
   repository: ConversationMutationRepository,
-  rateLimiter?: RateLimiter
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
 ): void {
   app.post(
     "/api/v1/conversations",
-    { preHandler: protect(apiKeys, "conversations:write", rateLimiter) },
+    { preHandler: protect(apiKeys, "conversations:write", rateLimiter, writeAccessPolicy) },
     async (request, reply) => {
       const parsed = createConversationSchema.safeParse(request.body);
       if (!parsed.success) {

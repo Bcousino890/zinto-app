@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
 import { webhookBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import type { RateLimiter } from "../http/rate-limit.js";
@@ -27,10 +28,25 @@ const createSchema = z.object({
   event_types: z.array(z.enum(webhookEventTypes)).min(1).max(webhookEventTypes.length)
 }).strict();
 
-function protect(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
+function protectRead(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
   const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
+    assertScopes(request.apiPrincipal!.scopes, ["webhooks:manage"]);
+  };
+}
+
+function protectWrite(
+  apiKeys: ApiKeyRepository,
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
+) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    await authenticate(request, reply);
+    if (writeAccessPolicy !== undefined && allowsAnyWrite(writeAccessPolicy)) {
+      assertWriteEnabled(writeAccessPolicy, request.apiPrincipal!);
+    }
     assertScopes(request.apiPrincipal!.scopes, ["webhooks:manage"]);
   };
 }
@@ -53,11 +69,13 @@ export function registerWebhookRoutes(
   apiKeys: ApiKeyRepository,
   repository: WebhookRepository,
   resolveHost?: HostResolver,
-  rateLimiter?: RateLimiter
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
 ): void {
-  const preHandler = protect(apiKeys, rateLimiter);
+  const readPreHandler = protectRead(apiKeys, rateLimiter);
+  const writePreHandler = protectWrite(apiKeys, rateLimiter, writeAccessPolicy);
 
-  app.post("/api/v1/webhooks", { bodyLimit: webhookBodyLimitBytes, preHandler }, async (request, reply) => {
+  app.post("/api/v1/webhooks", { bodyLimit: webhookBodyLimitBytes, preHandler: writePreHandler }, async (request, reply) => {
     const result = createSchema.safeParse(request.body);
     if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid");
     await assertSafeWebhookUrl(result.data.url, resolveHost);
@@ -73,14 +91,14 @@ export function registerWebhookRoutes(
     });
   });
 
-  app.get("/api/v1/webhooks", { preHandler }, async (request) => ({
+  app.get("/api/v1/webhooks", { preHandler: readPreHandler }, async (request) => ({
     data: await repository.list(request.apiPrincipal!.companyId),
     meta: { request_id: request.id }
   }));
 
   app.delete<{ Params: { id: string } }>(
     "/api/v1/webhooks/:id",
-    { preHandler },
+    { preHandler: writePreHandler },
     async (request, reply) => {
       if (!/^\d+$/.test(request.params.id)) {
         throw new ApiError(400, "validation_error", "The webhook ID is invalid");

@@ -1,8 +1,37 @@
+import { createHash } from "node:crypto";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
+import type { ApiKeyRecord, ApiKeyRepository } from "../src/auth/api-key.js";
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
+
+const rawKey = `pcp_${"b".repeat(64)}`;
+const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
+
+const writeEnabledRecord: ApiKeyRecord = {
+  id: 7,
+  companyId: 12,
+  companyName: "Empresa de prueba",
+  userId: 4,
+  name: "Write-enabled partner",
+  keyHash,
+  permissions: ["contacts:write"],
+  isActive: true,
+  expiresAt: null,
+  allowedIps: []
+};
+
+class MemoryApiKeyRepository implements ApiKeyRepository {
+  constructor(private readonly record: ApiKeyRecord | null) {}
+
+  async findByHash(hash: string): Promise<ApiKeyRecord | null> {
+    return hash === this.record?.keyHash ? this.record : null;
+  }
+
+  async markUsed(): Promise<void> {}
+}
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -80,6 +109,42 @@ describe("service health contract", () => {
       expect(response.statusCode).toBe(503);
       expect(response.json().error.code).toBe("read_only_mode");
     }
+  });
+
+  it("still lets an allowlisted API key write while global read-only stays enabled", async () => {
+    const app = await buildApp({
+      apiKeyRepository: new MemoryApiKeyRepository(writeEnabledRecord),
+      logger: false,
+      writeEnabledApiKeyIds: new Set([7])
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts/1",
+      headers: { authorization: `Bearer ${rawKey}` }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("not_found");
+  });
+
+  it("still lets an allowlisted company write while global read-only stays enabled", async () => {
+    const app = await buildApp({
+      apiKeyRepository: new MemoryApiKeyRepository(writeEnabledRecord),
+      logger: false,
+      writeEnabledCompanyIds: new Set([12])
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts/1",
+      headers: { authorization: `Bearer ${rawKey}` }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("not_found");
   });
 
   it("closes owned dependencies when the application stops", async () => {

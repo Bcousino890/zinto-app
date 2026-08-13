@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
+import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
 import type { DeliveryClient, DeliveryRequest, DeliveryResult } from "../delivery/client.js";
 import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
@@ -48,10 +49,17 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   return result.data;
 }
 
-function protect(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
+function protect(
+  apiKeys: ApiKeyRepository,
+  rateLimiter?: RateLimiter,
+  writeAccessPolicy?: WriteAccessPolicy
+) {
   const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
+    if (writeAccessPolicy !== undefined && allowsAnyWrite(writeAccessPolicy)) {
+      assertWriteEnabled(writeAccessPolicy, request.apiPrincipal!);
+    }
     assertScopes(request.apiPrincipal!.scopes, ["messages:send"]);
   };
 }
@@ -193,9 +201,10 @@ export function registerMessageSendRoutes(
   // Optional and last on purpose: undefined preserves today's behavior
   // exactly (no audit write attempted), matching how contactMutationRepository
   // is wired as an opt-in dependency in src/app.ts.
-  deliveryAudit?: DeliveryAuditRepository
+  deliveryAudit?: DeliveryAuditRepository,
+  writeAccessPolicy?: WriteAccessPolicy
 ): void {
-  const preHandler = protect(apiKeys, rateLimiter);
+  const preHandler = protect(apiKeys, rateLimiter, writeAccessPolicy);
   const routeOptions = { bodyLimit: messageBodyLimitBytes, preHandler };
 
   app.post("/api/v1/messages/send", routeOptions, async (request, reply) => {

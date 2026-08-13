@@ -28,6 +28,29 @@ describe("safe deployment configuration", () => {
     expect(config.WEBHOOK_WORKER_ENABLED).toBe(true);
   });
 
+  it("defaults the write allowlists to empty sets", () => {
+    const config = loadConfig(required);
+
+    expect(config.WRITE_ENABLED_API_KEY_IDS).toEqual([]);
+    expect(config.WRITE_ENABLED_COMPANY_IDS).toEqual([]);
+  });
+
+  it("parses the write allowlists as distinct positive integers", () => {
+    const config = loadConfig({
+      ...required,
+      WRITE_ENABLED_API_KEY_IDS: "7,11,7",
+      WRITE_ENABLED_COMPANY_IDS: "3,12,3"
+    });
+
+    expect(config.WRITE_ENABLED_API_KEY_IDS).toEqual([7, 11]);
+    expect(config.WRITE_ENABLED_COMPANY_IDS).toEqual([3, 12]);
+  });
+
+  it("rejects invalid write allowlist values", () => {
+    expect(() => loadConfig({ ...required, WRITE_ENABLED_API_KEY_IDS: "0,7" })).toThrow();
+    expect(() => loadConfig({ ...required, WRITE_ENABLED_COMPANY_IDS: "3,nope" })).toThrow();
+  });
+
   it("keeps the media proxy disabled unless it is switched on explicitly", () => {
     expect(loadConfig(required).MEDIA_PROXY_ENABLED).toBe(false);
   });

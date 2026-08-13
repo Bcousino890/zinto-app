@@ -36,6 +36,14 @@ mediante parametros del cliente.
 `GET /api/v1/me` devuelve los scopes efectivos. Si falta alguno, la API
 responde `403 insufficient_scope`.
 
+Los scopes no sustituyen la compuerta operativa de escritura. Aunque una clave
+tenga permisos como `contacts:write` o `messages:send`, Zinto puede mantener
+las escrituras globalmente cerradas con `READ_ONLY_MODE=true`. Desde el 13 de
+agosto de 2026 existe una excepcion controlada: el operador puede permitir
+escrituras solo a claves API o empresas concretas mediante
+`WRITE_ENABLED_API_KEY_IDS` y `WRITE_ENABLED_COMPANY_IDS`, sin abrir al resto
+de partners.
+
 ## Custodia de claves
 
 - Guarda la clave en un gestor de secretos o variable de entorno.
@@ -43,4 +51,3 @@ responde `403 insufficient_scope`.
 - Usa claves distintas por sistema y ambiente.
 - Configura una lista de IPs cuando el origen sea estable.
 - Desactiva y reemplaza una clave inmediatamente si se expone.
-

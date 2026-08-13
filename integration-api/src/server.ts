@@ -74,6 +74,8 @@ async function start(): Promise<void> {
       perIpMax: config.RATE_LIMIT_PER_IP_MAX
     }),
     readOnly: config.READ_ONLY_MODE,
+    writeEnabledApiKeyIds: new Set(config.WRITE_ENABLED_API_KEY_IDS),
+    writeEnabledCompanyIds: new Set(config.WRITE_ENABLED_COMPANY_IDS),
     readinessCheck: async () => {
       await pool.query("SELECT 1");
     },

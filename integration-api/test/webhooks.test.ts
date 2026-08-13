@@ -77,13 +77,19 @@ afterEach(async () => {
 const resolveTestHost = async (hostname: string): Promise<string[]> =>
   hostname === "localhost" ? ["127.0.0.1"] : ["93.184.216.34"];
 
-async function makeApp() {
+async function makeApp(options: {
+  readOnly?: boolean;
+  writeEnabledApiKeyIds?: number[];
+  writeEnabledCompanyIds?: number[];
+} = {}) {
   const repository = new MemoryWebhooks();
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeys(),
     hostResolver: resolveTestHost,
     logger: false,
-    readOnly: false,
+    readOnly: options.readOnly ?? false,
+    writeEnabledApiKeyIds: new Set(options.writeEnabledApiKeyIds ?? []),
+    writeEnabledCompanyIds: new Set(options.writeEnabledCompanyIds ?? []),
     webhookRepository: repository
   });
   apps.push(app);
@@ -98,6 +104,48 @@ describe("webhook signatures", () => {
 });
 
 describe("webhook endpoints", () => {
+  it("keeps listing webhooks readable while read-only is enabled and no allowlist is configured", async () => {
+    const { app } = await makeApp({ readOnly: true });
+    const response = await app.inject({ method: "GET", url: "/api/v1/webhooks", headers });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual([]);
+  });
+
+  it("blocks webhook creation in global read-only mode when no allowlist is configured", async () => {
+    const { app } = await makeApp({ readOnly: true });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/webhooks",
+      headers,
+      payload: {
+        url: "https://smartbc.example/webhooks/zinto",
+        event_types: ["message.created"]
+      }
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe("read_only_mode");
+  });
+
+  it("allows an allowlisted api key to manage webhooks while global read-only stays enabled", async () => {
+    const { app } = await makeApp({
+      readOnly: true,
+      writeEnabledApiKeyIds: [apiKey.id]
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/webhooks",
+      headers,
+      payload: {
+        url: "https://smartbc.example/webhooks/zinto",
+        event_types: ["message.created"]
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+  });
+
   it("creates an HTTPS endpoint and returns its secret exactly once", async () => {
     const { app, repository } = await makeApp();
     const response = await app.inject({
