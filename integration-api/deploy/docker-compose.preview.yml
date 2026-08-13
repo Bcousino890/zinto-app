@@ -20,6 +20,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=32m,noexec,nosuid,nodev
+    # Only mounted and only written to when MEDIA_PROXY_ENABLED=true; the
+    # container stays read_only otherwise. Named volume (not a bind mount) so
+    # its lifecycle is independent of this repo checkout and survives
+    # `docker compose down` unless explicitly removed with `-v`.
+    volumes:
+      - zinto-media-storage:/var/lib/zinto-media
     cap_drop:
       - ALL
     security_opt:
@@ -38,4 +44,7 @@ services:
 networks:
   powerchat-shared-network:
     external: true
+
+volumes:
+  zinto-media-storage: {}
 

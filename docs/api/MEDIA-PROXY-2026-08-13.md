@@ -97,22 +97,29 @@ fallo cerrado de configuración y la denegación del prefijo en Nginx.
 
 Esto está implementado y probado, pero **no basta con poner la variable a true**:
 
-1. **Volumen escribible.** El contenedor corre con `read_only: true` y solo tiene
-   un `tmpfs` de 32 MB en `/tmp`. Hay que añadir un volumen dedicado para
-   `MEDIA_STORAGE_DIR`, dimensionado para el pico de media y la ventana de
-   retención.
-2. **Aplicar la regla de Nginx.** El snippet
-   `deploy/nginx-integration-api-preview.conf` ya deniega
-   `/_integration-api/internal/`, pero **todavía no está aplicado en el vhost**
-   — confirmado por lectura directa del archivo real, no solo por esta nota.
-   Referencia única y definitiva de este hallazgo, con el cambio mínimo exacto
-   y la verificación paso a paso:
+1. **RESUELTO, en el archivo de despliegue, pendiente de un redeploy.**
+   Volumen escribible añadido en `deploy/docker-compose.preview.yml`
+   (`zinto-media-storage:/var/lib/zinto-media`, volumen nombrado, el
+   contenedor sigue `read_only: true` en todo lo demás). Sintaxis validada con
+   `docker compose config`. **No tomó efecto todavía**: solo se aplica la
+   próxima vez que el contenedor se recree — no se forzó un redeploy solo para
+   esto, para no repetir cambios de producción innecesarios.
+2. **RESUELTO y verificado en vivo el 13 de agosto de 2026.** Detalle:
    `docs/api/FINDING-NGINX-INTERNAL-PREFIX-2026-08-13.md`.
-3. **Confirmar que el motor legacy alcanza `MEDIA_INTERNAL_BASE_URL`** por la red
-   Docker compartida, y que acepta una URL de ese host.
+3. **RESUELTO y confirmado con una petición real, no solo por topología de
+   red.** El 13 de agosto de 2026 se ejecutó, desde dentro del contenedor del
+   motor legacy (`powerchat-app-bcousinoprop`), una petición real a
+   `http://zinto-integration-api-preview:3100/health` — respondió `200`. Los
+   tres contenedores relevantes comparten `powerchat-shared-network`
+   (confirmado con `docker network inspect`). `MEDIA_INTERNAL_BASE_URL` debe
+   ser `http://zinto-integration-api-preview:3100` cuando se active.
 4. **Comprobar los límites reales del proveedor** (WhatsApp) para cada tipo, y
-   ajustar `MEDIA_MAX_BYTES` en consecuencia.
-5. **E2E autorizado** con números de prueba antes de abrirlo a un partner.
+   ajustar `MEDIA_MAX_BYTES` en consecuencia. En curso.
+5. **E2E autorizado** con números de prueba antes de abrirlo a un partner. El
+   E2E del 13 de agosto de 2026 (`docs/api/E2E-PILOT-RESULT-2026-08-13.md`)
+   cubrió texto, notas, etiquetas y cambio de etapa — **no cubrió media**,
+   porque el proxy seguía desactivado en ese momento. Sigue pendiente un E2E
+   específico de media una vez cerrados los puntos 1 y 4.
 
 Hasta completar los cinco puntos, `send-media` no debe habilitarse para
 terceros, y el riesgo residual descrito en
