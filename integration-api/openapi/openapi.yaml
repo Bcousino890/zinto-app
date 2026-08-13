@@ -414,6 +414,34 @@ paths:
                       data:
                         type: array
                         items: { $ref: "#/components/schemas/Conversation" }
+    post:
+      tags: [Conversations]
+      operationId: createConversation
+      summary: Find or create the conversation of a contact on a channel
+      description: >-
+        Returns the existing one-to-one conversation between the contact and the
+        channel, or creates it when there is none. Safe to retry and safe under
+        concurrency: two simultaneous calls for the same pair are serialised and
+        return the same conversation, never a duplicate. `channel_type` is
+        derived from the channel itself and cannot be supplied by the caller.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConversationCreate" }
+      responses:
+        "200":
+          description: The conversation already existed and is returned unchanged
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversationResponse" }
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversationResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/conversations/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -881,6 +909,18 @@ components:
       type: object
       properties:
         data: { $ref: "#/components/schemas/Note" }
+        meta: { $ref: "#/components/schemas/RequestMeta" }
+    ConversationCreate:
+      type: object
+      required: [contact_id, channel_id]
+      additionalProperties: false
+      properties:
+        contact_id: { type: string, pattern: "^\\d+$" }
+        channel_id: { type: string, pattern: "^\\d+$" }
+    ConversationResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Conversation" }
         meta: { $ref: "#/components/schemas/RequestMeta" }
     Conversation:
       type: object
