@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
+import { webhookBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import { assertSafeDestination, type HostResolver } from "../net/destination.js";
 import type { WebhookRepository } from "../webhooks/repository.js";
@@ -54,7 +55,7 @@ export function registerWebhookRoutes(
 ): void {
   const preHandler = protect(apiKeys);
 
-  app.post("/api/v1/webhooks", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/webhooks", { bodyLimit: webhookBodyLimitBytes, preHandler }, async (request, reply) => {
     const result = createSchema.safeParse(request.body);
     if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid");
     await assertSafeWebhookUrl(result.data.url, resolveHost);

@@ -6,6 +6,7 @@ import { assertScopes } from "../auth/scopes.js";
 import type { DeliveryClient, DeliveryRequest } from "../delivery/client.js";
 import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
+import { messageBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
 import type { HostResolver } from "../net/destination.js";
@@ -125,8 +126,9 @@ export function registerMessageSendRoutes(
   resolveHost?: HostResolver
 ): void {
   const preHandler = protect(apiKeys);
+  const routeOptions = { bodyLimit: messageBodyLimitBytes, preHandler };
 
-  app.post("/api/v1/messages/send", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send", routeOptions, async (request, reply) => {
     const input = parse(textSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "text");
@@ -139,7 +141,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-media", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-media", routeOptions, async (request, reply) => {
     const input = parse(mediaSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "media");
@@ -156,7 +158,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-template", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-template", routeOptions, async (request, reply) => {
     const input = parse(templateSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "template");
@@ -171,7 +173,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-interactive", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-interactive", routeOptions, async (request, reply) => {
     const input = parse(interactiveSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "interactive");
