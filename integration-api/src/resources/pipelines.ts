@@ -130,7 +130,7 @@ interface PipelineStageRow {
   updated_at: Timestamp;
 }
 
-interface DealRow {
+export interface DealRow {
   id: number;
   pipeline_id: number;
   contact_id: number;
@@ -172,11 +172,18 @@ interface TaskRow {
 
 const reference = (value: number | null): string | null => value === null ? null : String(value);
 
-const DEAL_COLUMNS = `deals.id, deals.pipeline_id, deals.contact_id, deals.title,
-              deals.stage, deals.stage_id, pipeline_stages.name AS stage_name,
+/**
+ * Columnas que viven en `deals` y no dependen del join con la etapa: sirven
+ * igual para el SELECT de lectura y para el RETURNING de una escritura, que no
+ * tiene el join disponible.
+ */
+export const DEAL_OWN_COLUMNS = `deals.id, deals.pipeline_id, deals.contact_id, deals.title,
+              deals.stage, deals.stage_id,
               deals.value, deals.priority, deals.status, deals.due_date,
               deals.assigned_to_user_id, deals.description, deals.tags,
               deals.custom_fields, deals.last_activity_at, deals.created_at, deals.updated_at`;
+
+const DEAL_COLUMNS = `${DEAL_OWN_COLUMNS}, pipeline_stages.name AS stage_name`;
 
 /**
  * La etapa solo se resuelve dentro del mismo pipeline y empresa: una referencia
@@ -188,7 +195,11 @@ const DEAL_SOURCE = `deals
                AND pipeline_stages.pipeline_id = deals.pipeline_id
                AND pipeline_stages.company_id = deals.company_id`;
 
-function dealResource(row: DealRow): DealResource {
+/**
+ * Unico punto de mapeo de una fila de `deals` al recurso publico: las
+ * escrituras reutilizan esta funcion para no inventar un segundo shape.
+ */
+export function dealResource(row: DealRow): DealResource {
   return {
     id: String(row.id),
     pipeline_id: String(row.pipeline_id),
