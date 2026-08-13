@@ -6,8 +6,10 @@ import { assertScopes } from "../auth/scopes.js";
 import type { DeliveryClient, DeliveryRequest } from "../delivery/client.js";
 import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
+import { messageBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { RateLimiter } from "../http/rate-limit.js";
 import type { MediaProxy } from "../media/proxy.js";
 import type { HostResolver } from "../net/destination.js";
 import type { ChannelResource, CoreRepository } from "../resources/core.js";
@@ -45,8 +47,8 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   return result.data;
 }
 
-function protect(apiKeys: ApiKeyRepository) {
-  const authenticate = createApiKeyAuthenticator(apiKeys);
+function protect(apiKeys: ApiKeyRepository, rateLimiter?: RateLimiter) {
+  const authenticate = createApiKeyAuthenticator(apiKeys, rateLimiter);
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await authenticate(request, reply);
     assertScopes(request.apiPrincipal!.scopes, ["messages:send"]);
@@ -98,6 +100,9 @@ async function performDelivery(
         };
       }
       if (error instanceof DeliveryAdapterError) {
+        // Only the status code is logged: `error.response` is the raw legacy
+        // payload, which can carry customer phone numbers or message content.
+        request.log.warn({ statusCode: error.statusCode }, "legacy delivery engine rejected the message");
         return {
           statusCode: 502,
           body: {
@@ -121,11 +126,13 @@ export function registerMessageSendRoutes(
   idempotency: IdempotencyRepository,
   delivery: DeliveryClient,
   resolveHost?: HostResolver,
-  mediaProxy?: MediaProxy
+  mediaProxy?: MediaProxy,
+  rateLimiter?: RateLimiter
 ): void {
-  const preHandler = protect(apiKeys);
+  const preHandler = protect(apiKeys, rateLimiter);
+  const routeOptions = { bodyLimit: messageBodyLimitBytes, preHandler };
 
-  app.post("/api/v1/messages/send", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send", routeOptions, async (request, reply) => {
     const input = parse(textSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "text");
@@ -138,7 +145,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-media", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-media", routeOptions, async (request, reply) => {
     const input = parse(mediaSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "media");
@@ -163,7 +170,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-template", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-template", routeOptions, async (request, reply) => {
     const input = parse(templateSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "template");
@@ -178,7 +185,7 @@ export function registerMessageSendRoutes(
     });
   });
 
-  app.post("/api/v1/messages/send-interactive", { preHandler }, async (request, reply) => {
+  app.post("/api/v1/messages/send-interactive", routeOptions, async (request, reply) => {
     const input = parse(interactiveSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "interactive");

@@ -11,7 +11,10 @@ import { registerMediaRoutes } from "./routes/media.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
+import { globalBodyLimitBytes } from "./http/body-limits.js";
 import { ApiError, registerErrorHandlers } from "./http/errors.js";
+import { secureLoggerOptions } from "./http/logging.js";
+import { createIpRateLimitHook, defaultRateLimitConfig, RateLimiter } from "./http/rate-limit.js";
 import type { CoreRepository } from "./resources/core.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
 import { registerCoreRoutes } from "./routes/core.js";
@@ -33,6 +36,7 @@ export interface AppOptions {
   mediaStore?: MediaStore;
   onClose?: () => Promise<void>;
   pipelineRepository?: PipelineRepository;
+  rateLimiter?: RateLimiter;
   readOnly?: boolean;
   readinessCheck?: () => Promise<void>;
   trustProxy?: FastifyServerOptions["trustProxy"];
@@ -41,11 +45,15 @@ export interface AppOptions {
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
+    bodyLimit: globalBodyLimitBytes,
     genReqId: () => `req_${randomUUID()}`,
-    logger: options.logger ?? true,
+    logger: options.logger ?? secureLoggerOptions(),
     trustProxy: options.trustProxy ?? false
   });
   app.decorateRequest("apiPrincipal", null);
+
+  const rateLimiter = options.rateLimiter ?? new RateLimiter(defaultRateLimitConfig);
+  app.addHook("onRequest", createIpRateLimitHook(rateLimiter));
 
   app.addHook("onRequest", async (request) => {
     const readOnly = options.readOnly ?? true;
@@ -93,9 +101,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   if (options.apiKeyRepository !== undefined) {
-    registerMeRoute(app, options.apiKeyRepository);
+    registerMeRoute(app, options.apiKeyRepository, rateLimiter);
     if (options.coreRepository !== undefined) {
-      registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository);
+      registerCoreRoutes(app, options.apiKeyRepository, options.coreRepository, rateLimiter);
     }
     if (options.pipelineRepository !== undefined) {
       registerPipelineRoutes(app, options.apiKeyRepository, options.pipelineRepository);
@@ -105,7 +113,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.contactMutationRepository,
-        options.idempotencyRepository
+        options.idempotencyRepository,
+        rateLimiter
       );
     }
     if (options.coreRepository !== undefined && options.idempotencyRepository !== undefined &&
@@ -117,7 +126,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.idempotencyRepository,
         options.deliveryClient,
         options.hostResolver,
-        options.mediaProxy
+        options.mediaProxy,
+        rateLimiter
       );
     }
     if (options.webhookRepository !== undefined) {
@@ -125,7 +135,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         app,
         options.apiKeyRepository,
         options.webhookRepository,
-        options.hostResolver
+        options.hostResolver,
+        rateLimiter
       );
     }
   }

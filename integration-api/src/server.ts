@@ -4,6 +4,8 @@ import { PostgresApiKeyRepository } from "./db/api-keys.js";
 import { PostgresIdempotencyRepository } from "./db/idempotency.js";
 import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
+import { secureLoggerOptions } from "./http/logging.js";
+import { RateLimiter } from "./http/rate-limit.js";
 import { DownloadingMediaProxy } from "./media/proxy.js";
 import { FilesystemMediaStore } from "./media/store.js";
 import { PostgresCoreRepository } from "./resources/core.js";
@@ -32,10 +34,7 @@ async function start(): Promise<void> {
     coreRepository: new PostgresCoreRepository(pool),
     deliveryClient: new LegacyDeliveryClient(config.LEGACY_API_URL, config.LEGACY_DELIVERY_TIMEOUT_MS),
     idempotencyRepository: new PostgresIdempotencyRepository(pool),
-    logger: {
-      level: config.LOG_LEVEL,
-      redact: ["req.headers.authorization", "req.headers.cookie"]
-    },
+    logger: secureLoggerOptions(config.LOG_LEVEL),
     mediaProxy: mediaStore === undefined ? undefined : new DownloadingMediaProxy(mediaStore, {
       maxBytes: config.MEDIA_MAX_BYTES,
       timeoutMs: config.LEGACY_DELIVERY_TIMEOUT_MS
@@ -47,6 +46,12 @@ async function start(): Promise<void> {
       if (mediaPurge !== undefined) clearInterval(mediaPurge);
       await pool.end();
     },
+    rateLimiter: new RateLimiter({
+      windowMs: config.RATE_LIMIT_WINDOW_MS,
+      perKeyMax: config.RATE_LIMIT_PER_KEY_MAX,
+      perCompanyMax: config.RATE_LIMIT_PER_COMPANY_MAX,
+      perIpMax: config.RATE_LIMIT_PER_IP_MAX
+    }),
     readOnly: config.READ_ONLY_MODE,
     readinessCheck: async () => {
       await pool.query("SELECT 1");
