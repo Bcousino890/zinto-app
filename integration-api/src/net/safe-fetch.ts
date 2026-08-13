@@ -160,6 +160,11 @@ export function createSafeFetch(options: SafeFetchOptions = {}) {
     let url = parseDestination(request.url, allowedProtocols);
 
     for (let hop = 0; ; hop += 1) {
+      // This is the ONLY check for a literal IP: Node skips the custom `lookup`
+      // in guardedLookup below whenever the hostname is already an address, so
+      // for that case this line is not a redundant belt-and-braces pass — it is
+      // the sole line of defence. Do not remove it as a "duplicate" of the
+      // pinning inside performRequest.
       await assertSafeAddresses(url.hostname, {
         protocols: allowedProtocols,
         resolve: options.resolve,
