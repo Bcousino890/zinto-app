@@ -180,7 +180,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.apiKeyRepository,
         options.conversationMutationRepository,
         rateLimiter,
-        writeAccessPolicy
+        writeAccessPolicy,
+        options.idempotencyRepository
       );
     }
     if (options.contactMutationRepository !== undefined && options.idempotencyRepository !== undefined) {

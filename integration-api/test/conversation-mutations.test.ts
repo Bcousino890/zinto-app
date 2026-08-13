@@ -8,6 +8,7 @@ import type {
   ConversationCreateResult,
   ConversationMutationRepository
 } from "../src/resources/conversation-mutations.js";
+import type { IdempotencyRecord, IdempotencyRepository, IdempotencyScope } from "../src/http/idempotency.js";
 
 const rawKey = `pcp_${"d".repeat(64)}`;
 const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
@@ -62,6 +63,17 @@ class MemoryConversationMutationRepository implements ConversationMutationReposi
     [999, { companyId: 77, type: "whatsapp_official" }]
   ]);
 
+  async updateConversation(companyId: number, conversationId: number, _userId: number, input: import("../src/resources/conversation-mutations.js").ConversationUpdateInput) {
+    const row = this.conversations.find((conversation) => conversation.companyId === companyId && conversation.id === conversationId);
+    if (row === undefined) return null;
+    return {
+      id: String(row.id), contact_id: String(row.contactId), channel_id: String(row.channelId), channel_type: row.channelType,
+      status: input.status ?? "open", assigned_to_user_id: input.assigned_to_user_id ?? null,
+      last_message_at: "2026-08-13T12:00:00.000Z", unread_count: 0, bot_disabled: input.bot_disabled ?? false,
+      archived: input.archived ?? false, created_at: "2026-08-13T12:00:00.000Z", updated_at: "2026-08-13T12:00:00.000Z"
+    };
+  }
+
   async findOrCreateConversation(
     companyId: number,
     contactId: number,
@@ -106,6 +118,14 @@ class MemoryConversationMutationRepository implements ConversationMutationReposi
   }
 }
 
+class MemoryIdempotencyRepository implements IdempotencyRepository {
+  private readonly records = new Map<string, IdempotencyRecord>();
+  private key(scope: IdempotencyScope): string { return `${scope.apiKeyId}:${scope.method}:${scope.path}:${scope.key}`; }
+  async find(scope: IdempotencyScope): Promise<IdempotencyRecord | null> { return this.records.get(this.key(scope)) ?? null; }
+  async save(scope: IdempotencyScope, record: IdempotencyRecord): Promise<void> { this.records.set(this.key(scope), record); }
+  async runExclusive<T>(_scope: IdempotencyScope, operation: () => Promise<T>): Promise<T> { return operation(); }
+}
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
@@ -115,6 +135,7 @@ async function makeApp(permissions: string[] = ["conversations:write"]) {
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeyRepository(permissions),
     conversationMutationRepository: conversations,
+    idempotencyRepository: new MemoryIdempotencyRepository(),
     logger: false,
     readOnly: false
   });
@@ -274,5 +295,24 @@ describe("conversation find-or-create route", () => {
     expect(response.statusCode).toBe(503);
     expect(response.json().error.code).toBe("read_only_mode");
     expect(conversations.conversations).toHaveLength(0);
+  });
+
+  it("updates a conversation with idempotency and tenant-safe not-found behavior", async () => {
+    const { app } = await makeApp();
+    const created = await app.inject(create({ contact_id: "101", channel_id: "55" }));
+    const id = created.json().data.id;
+    const response = await app.inject({
+      method: "PATCH", url: `/api/v1/conversations/${id}`,
+      headers: { ...authHeaders, "idempotency-key": "conversation-update-1" },
+      payload: { archived: true, bot_disabled: true }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual(expect.objectContaining({ archived: true, bot_disabled: true }));
+    const missing = await app.inject({
+      method: "PATCH", url: "/api/v1/conversations/999999",
+      headers: { ...authHeaders, "idempotency-key": "conversation-update-2" }, payload: { archived: true }
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error.code).toBe("conversation_not_found");
   });
 });

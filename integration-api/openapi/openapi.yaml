@@ -604,6 +604,36 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/conversations/{id}:
+    patch:
+      tags: [Conversations]
+      operationId: updateConversation
+      summary: Update assignment and state of a conversation
+      description: Requires `conversations:write` and an `Idempotency-Key`.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                status: { type: string, minLength: 1, maxLength: 50 }
+                assigned_to_user_id: { type: [string, "null"], pattern: '^\d+$' }
+                bot_disabled: { type: boolean }
+                archived: { type: boolean }
+      responses:
+        "200": { description: Conversation updated }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/conversations/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"

@@ -5,9 +5,11 @@ import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-ke
 import { assertScopes } from "../auth/scopes.js";
 import { allowsAnyWrite, assertWriteEnabled, type WriteAccessPolicy } from "../auth/write-access.js";
 import { ApiError } from "../http/errors.js";
+import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
 import type { RateLimiter } from "../http/rate-limit.js";
 import type {
   ConversationCreateFailure,
+  ConversationUpdateInput,
   ConversationMutationRepository
 } from "../resources/conversation-mutations.js";
 
@@ -19,6 +21,12 @@ const createConversationSchema = z.object({
   contact_id: z.string().regex(/^\d+$/),
   channel_id: z.string().regex(/^\d+$/)
 }).strict();
+const updateConversationSchema = z.object({
+  status: z.string().trim().min(1).max(50).optional(),
+  assigned_to_user_id: z.string().regex(/^\d+$/).nullable().optional(),
+  bot_disabled: z.boolean().optional(),
+  archived: z.boolean().optional()
+}).strict().refine((value) => Object.keys(value).length > 0);
 
 function protect(
   apiKeys: ApiKeyRepository,
@@ -54,7 +62,8 @@ export function registerConversationMutationRoutes(
   apiKeys: ApiKeyRepository,
   repository: ConversationMutationRepository,
   rateLimiter?: RateLimiter,
-  writeAccessPolicy?: WriteAccessPolicy
+  writeAccessPolicy?: WriteAccessPolicy,
+  idempotency?: IdempotencyRepository
 ): void {
   app.post(
     "/api/v1/conversations",
@@ -81,4 +90,29 @@ export function registerConversationMutationRoutes(
         .send({ data: result.conversation, meta: { request_id: request.id } });
     }
   );
+  const updateConversation = repository.updateConversation?.bind(repository);
+  if (idempotency !== undefined && updateConversation !== undefined) {
+    app.patch<{ Params: { id: string } }>(
+      "/api/v1/conversations/:id",
+      { preHandler: protect(apiKeys, "conversations:write", rateLimiter, writeAccessPolicy) },
+      async (request, reply) => {
+        if (!/^\d+$/.test(request.params.id) || !Number.isSafeInteger(Number(request.params.id))) {
+          throw new ApiError(400, "validation_error", "The conversation ID is invalid");
+        }
+        const parsed = updateConversationSchema.safeParse(request.body);
+        if (!parsed.success) throw new ApiError(400, "validation_error", "The request body is invalid");
+        const input: ConversationUpdateInput = parsed.data;
+        return withIdempotency(request, reply, idempotency, async () => {
+          const value = await updateConversation(
+            request.apiPrincipal!.companyId,
+            Number(request.params.id),
+            request.apiPrincipal!.userId,
+            input
+          );
+          if (value === null) throw new ApiError(404, "conversation_not_found", "The conversation was not found");
+          return { statusCode: 200, body: { data: value, meta: { request_id: request.id } } };
+        });
+      }
+    );
+  }
 }

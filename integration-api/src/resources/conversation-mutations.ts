@@ -14,13 +14,16 @@ export type ConversationCreateResult =
   | { ok: true; created: boolean; conversation: ConversationResource }
   | { ok: false; reason: ConversationCreateFailure };
 
+export interface ConversationUpdateInput {
+  status?: string;
+  assigned_to_user_id?: string | null;
+  bot_disabled?: boolean;
+  archived?: boolean;
+}
+
 export interface ConversationMutationRepository {
-  findOrCreateConversation(
-    companyId: number,
-    contactId: number,
-    channelId: number,
-    userId: number
-  ): Promise<ConversationCreateResult>;
+  findOrCreateConversation(companyId: number, contactId: number, channelId: number, userId: number): Promise<ConversationCreateResult>;
+  updateConversation?(companyId: number, conversationId: number, userId: number, input: ConversationUpdateInput): Promise<ConversationResource | null>;
 }
 
 interface ConversationRow {
@@ -115,6 +118,31 @@ export class PostgresConversationMutationRepository implements ConversationMutat
        VALUES ($1, $2, $3, $4, $5::jsonb)`,
       [companyId, eventType, resourceType, resourceId, JSON.stringify(payload)]
     );
+  }
+
+  async updateConversation(companyId: number, conversationId: number, userId: number, input: ConversationUpdateInput): Promise<ConversationResource | null> {
+    return this.transaction(async (client) => {
+      const result = await client.query<ConversationRow>(
+        `UPDATE conversations SET
+           status = CASE WHEN $3::boolean THEN $4 ELSE status END,
+           assigned_to_user_id = CASE WHEN $5::boolean THEN $6::integer ELSE assigned_to_user_id END,
+           bot_disabled = CASE WHEN $7::boolean THEN $8 ELSE bot_disabled END,
+           is_archived = CASE WHEN $9::boolean THEN $10 ELSE is_archived END,
+           updated_at = now()
+         WHERE id = $1 AND company_id = $2
+         RETURNING ${CONVERSATION_COLUMNS}`,
+        [conversationId, companyId,
+          input.status !== undefined, input.status ?? null,
+          input.assigned_to_user_id !== undefined, input.assigned_to_user_id,
+          input.bot_disabled !== undefined, input.bot_disabled ?? false,
+          input.archived !== undefined, input.archived ?? false]
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      const value = conversation(row);
+      await this.record(client, companyId, userId, "conversation.updated", "conversation", conversationId, value);
+      return value;
+    });
   }
 
   /**
