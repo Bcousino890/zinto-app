@@ -15,6 +15,29 @@ const configSchema = z.object({
   MEDIA_INTERNAL_BASE_URL: z.string().url().optional(),
   MEDIA_MAX_BYTES: z.coerce.number().int().min(1024).max(104_857_600).default(16_777_216),
   MEDIA_RETENTION_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
+  // Retention for the service's own bookkeeping tables (idempotency records,
+  // the event outbox, and webhook delivery attempts) - see src/db/retention.ts
+  // for the purge job and the reasoning behind each window.
+  //
+  // IDEMPOTENCY_RETENTION_HOURS is a grace period *added on top of* the
+  // expires_at each row already gets at insert time (24h, see
+  // migrations/001_integration_api.sql) - the read path already ignores rows
+  // past expires_at, so this only controls how long an expired row lingers
+  // for debugging/support ("the partner says we double-charged them") before
+  // it is deleted. 24h of extra grace (48h total from creation) is generous
+  // enough to absorb clock skew and a late partner retry without keeping
+  // rows around indefinitely.
+  IDEMPOTENCY_RETENTION_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  // OUTBOX_RETENTION_DAYS keeps processed outbox events around for a week so
+  // recent delivery activity can still be debugged, without letting the
+  // table grow forever.
+  OUTBOX_RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+  // WEBHOOK_DELIVERY_RETENTION_DAYS outlives the outbox window on purpose:
+  // delivery rows are the audit trail partners and support ask about
+  // ("why didn't my webhook fire on the 3rd?") and they are cheap to keep
+  // (no event payload, just status/attempt metadata), so they get a longer
+  // default retention than the raw outbox events they were generated from.
+  WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(1).max(180).default(30),
   // See src/http/rate-limit.ts for why these three buckets are sized the way
   // they are (key < IP < company).
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).max(3_600_000)

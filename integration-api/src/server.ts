@@ -4,6 +4,7 @@ import { PostgresApiKeyRepository } from "./db/api-keys.js";
 import { PostgresIdempotencyRepository } from "./db/idempotency.js";
 import { LegacyDeliveryClient } from "./delivery/client.js";
 import { createDatabasePool } from "./db/pool.js";
+import { PostgresRetentionRepository, startRetentionPurge } from "./db/retention.js";
 import { secureLoggerOptions } from "./http/logging.js";
 import { RateLimiter } from "./http/rate-limit.js";
 import { DownloadingMediaProxy } from "./media/proxy.js";
@@ -23,6 +24,7 @@ async function start(): Promise<void> {
   const pool = createDatabasePool(config.DATABASE_URL);
   const webhookCipher = new WebhookSecretCipher(config.WEBHOOK_ENCRYPTION_KEY);
   let stopWebhookWorker: () => void = () => undefined;
+  let stopRetentionPurge: () => void = () => undefined;
   const mediaStore = config.MEDIA_PROXY_ENABLED
     ? new FilesystemMediaStore(config.MEDIA_STORAGE_DIR, config.MEDIA_INTERNAL_BASE_URL!)
     : undefined;
@@ -47,6 +49,7 @@ async function start(): Promise<void> {
     pipelineRepository: new PostgresPipelineRepository(pool),
     onClose: async () => {
       stopWebhookWorker();
+      stopRetentionPurge();
       if (mediaPurge !== undefined) clearInterval(mediaPurge);
       await pool.end();
     },
@@ -70,6 +73,21 @@ async function start(): Promise<void> {
       (error) => app.log.error({ err: error }, "webhook worker iteration failed")
     );
   }
+  // Runs unconditionally, like mediaPurge above: it only ever deletes rows
+  // from this service's own idempotency/outbox/webhook-delivery tables (never
+  // business data), so there is no read-only or feature-flag gate to honor -
+  // READ_ONLY_MODE only guards the partner-facing /api/v1/ write routes
+  // (see src/app.ts).
+  stopRetentionPurge = startRetentionPurge(
+    new PostgresRetentionRepository(pool),
+    {
+      idempotencyGraceMs: config.IDEMPOTENCY_RETENTION_HOURS * 60 * 60_000,
+      outboxRetentionMs: config.OUTBOX_RETENTION_DAYS * 24 * 60 * 60_000,
+      webhookDeliveryRetentionMs: config.WEBHOOK_DELIVERY_RETENTION_DAYS * 24 * 60 * 60_000
+    },
+    60_000,
+    (scope, error) => app.log.error({ err: error, scope }, "retention purge failed")
+  );
 
   try {
     await app.listen({ host: config.HOST, port: config.PORT });
