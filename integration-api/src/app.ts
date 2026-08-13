@@ -16,10 +16,12 @@ import { ApiError, registerErrorHandlers } from "./http/errors.js";
 import { secureLoggerOptions } from "./http/logging.js";
 import { createIpRateLimitHook, defaultRateLimitConfig, RateLimiter } from "./http/rate-limit.js";
 import type { CoreRepository } from "./resources/core.js";
+import type { PipelineMutationRepository } from "./resources/pipeline-mutations.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
+import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -35,6 +37,7 @@ export interface AppOptions {
   mediaProxy?: MediaProxy;
   mediaStore?: MediaStore;
   onClose?: () => Promise<void>;
+  pipelineMutationRepository?: PipelineMutationRepository;
   pipelineRepository?: PipelineRepository;
   rateLimiter?: RateLimiter;
   readOnly?: boolean;
@@ -107,6 +110,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
     if (options.pipelineRepository !== undefined) {
       registerPipelineRoutes(app, options.apiKeyRepository, options.pipelineRepository);
+    }
+    if (options.pipelineMutationRepository !== undefined) {
+      registerPipelineMutationRoutes(
+        app,
+        options.apiKeyRepository,
+        options.pipelineMutationRepository,
+        rateLimiter
+      );
     }
     if (options.contactMutationRepository !== undefined && options.idempotencyRepository !== undefined) {
       registerContactMutationRoutes(

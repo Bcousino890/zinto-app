@@ -334,6 +334,39 @@ paths:
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/deals/{id}/stage:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    patch:
+      tags: [Deals]
+      operationId: changeDealStage
+      summary: Move a deal to another stage of its own pipeline
+      description: >
+        Writes stage_id and the legacy stage_key together, exactly as the CRM
+        does, so both vocabularies stay as aligned as the engine keeps them.
+        The target stage must belong to the pipeline the deal is already in;
+        moving a deal between pipelines is a different operation and is
+        rejected with stage_pipeline_mismatch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealStageInput" }
+      responses:
+        "200":
+          description: Deal with its new stage
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: "#/components/schemas/Deal" }
+                  meta: { $ref: "#/components/schemas/RequestMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/StagePipelineMismatch" }
   /api/v1/tasks:
     get:
       tags: [Tasks]
@@ -598,6 +631,11 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
+    StagePipelineMismatch:
+      description: Stage exists but belongs to a different pipeline than the deal
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     UnsupportedCapability:
       description: Selected channel does not support the operation
       content:
@@ -778,6 +816,15 @@ components:
         last_activity_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    DealStageInput:
+      type: object
+      required: [stage_id]
+      additionalProperties: false
+      properties:
+        stage_id:
+          type: string
+          pattern: '^\d+$'
+          description: Stage of the same pipeline the deal already belongs to.
     Task:
       type: object
       required: [id, contact_id, title, priority, status, tags, created_at, updated_at]
