@@ -70,6 +70,7 @@ describe("OpenAPI partner contract", () => {
       "GET /health",
       "GET /ready",
       "PATCH /api/v1/contacts/{id}",
+      "PATCH /api/v1/deals/{id}/stage",
       "PATCH /api/v1/notes/{id}",
       "POST /api/v1/contacts",
       "POST /api/v1/contacts/{id}/notes",
@@ -95,7 +96,8 @@ describe("OpenAPI partner contract", () => {
     const app = await buildApp({
       apiKeyRepository: stub, contactMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
-      mediaStore: stub, pipelineRepository: stub, webhookRepository: stub
+      mediaStore: stub, pipelineMutationRepository: stub, pipelineRepository: stub,
+      webhookRepository: stub
     } as never);
     const registered = routesOf(app.printRoutes({ commonPrefix: false }));
     await app.close();
