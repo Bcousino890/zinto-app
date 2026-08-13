@@ -299,6 +299,14 @@ paths:
       tags: [Messages]
       operationId: sendMediaMessage
       summary: Send public media through a selected channel
+      description: >
+        The media URL must resolve to a public address; private, loopback,
+        link-local, CGNAT and reserved ranges are refused for both IPv4 and
+        IPv6. When the media proxy is enabled the service downloads the media
+        itself and forwards an internal URL to the delivery engine, so the
+        origin never learns which engine fetched it. Errors use the codes
+        unsafe_media_url, media_unreachable, media_too_large and
+        media_type_mismatch.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
