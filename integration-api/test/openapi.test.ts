@@ -54,6 +54,7 @@ describe("OpenAPI partner contract", () => {
     expect(operations).toEqual([
       "DELETE /api/v1/contacts/{id}",
       "DELETE /api/v1/contacts/{id}/tags/{tag}",
+      "DELETE /api/v1/deals/{id}",
       "DELETE /api/v1/notes/{id}",
       "DELETE /api/v1/pipelines/{id}",
       "DELETE /api/v1/pipelines/{id}/stages/{stageId}",
@@ -77,6 +78,7 @@ describe("OpenAPI partner contract", () => {
       "GET /ready",
       "PATCH /api/v1/contacts/{id}",
       "PATCH /api/v1/conversations/{id}",
+      "PATCH /api/v1/deals/{id}",
       "PATCH /api/v1/deals/{id}/stage",
       "PATCH /api/v1/notes/{id}",
       "PATCH /api/v1/pipelines/{id}",
@@ -85,6 +87,8 @@ describe("OpenAPI partner contract", () => {
       "POST /api/v1/contacts",
       "POST /api/v1/contacts/{id}/notes",
       "POST /api/v1/conversations",
+      "POST /api/v1/deals",
+      "POST /api/v1/deals/{id}/move",
       "POST /api/v1/messages/send",
       "POST /api/v1/messages/send-interactive",
       "POST /api/v1/messages/send-media",
@@ -112,7 +116,7 @@ describe("OpenAPI partner contract", () => {
       conversationMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
       mediaStore: stub, pipelineMutationRepository: stub, pipelineCrudRepository: stub, pipelineRepository: stub,
-      taskMutationRepository: stub, webhookRepository: stub
+      taskMutationRepository: stub, dealMutationRepository: stub, webhookRepository: stub
     } as never);
     const registered = routesOf(app.printRoutes({ commonPrefix: false }));
     await app.close();
