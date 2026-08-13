@@ -186,10 +186,12 @@ export class PostgresPipelineMutationRepository implements PipelineMutationRepos
           // real de la API key, que es lo unico que si esta en nuestra mano.
           userId,
           stage.name,
+          // Identificadores numericos, no las cadenas que expone nuestro JSON:
+          // esta fila la lee el CRM, y el motor escribe numeros aqui.
           JSON.stringify({
-            previousStageId: deal.stage_id === null ? null : String(deal.stage_id),
-            newStageId: String(stageId),
-            pipelineId: String(deal.pipeline_id)
+            previousStageId: deal.stage_id,
+            newStageId: stageId,
+            pipelineId: deal.pipeline_id
           })
         ]
       );

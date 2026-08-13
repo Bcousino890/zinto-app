@@ -186,10 +186,12 @@ describe("deal stage write repository", () => {
     expect(activity.params[1]).toBe(7);
     expect(activity.params[1]).not.toBe(updated.assigned_to_user_id);
     expect(activity.params[2]).toBe("Closed Lost");
+    // El motor guarda numeros en esta metadata; nuestra convencion de cadenas
+    // solo aplica al JSON que ve el partner.
     expect(JSON.parse(activity.params[3] as string)).toEqual({
-      previousStageId: "310",
-      newStageId: "311",
-      pipelineId: "31"
+      previousStageId: 310,
+      newStageId: 311,
+      pipelineId: 31
     });
   });
 
