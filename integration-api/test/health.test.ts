@@ -45,4 +45,18 @@ describe("service health contract", () => {
       }
     });
   });
+
+  it("closes owned dependencies when the application stops", async () => {
+    let closed = false;
+    const app = await buildApp({
+      logger: false,
+      onClose: async () => {
+        closed = true;
+      }
+    });
+
+    await app.close();
+
+    expect(closed).toBe(true);
+  });
 });
