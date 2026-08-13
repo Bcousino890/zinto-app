@@ -90,6 +90,13 @@ describe("remote media download", () => {
       fetch: respondWith("alert(1)", "text/html")
     })).rejects.toMatchObject({ code: "media_type_mismatch" });
   });
+
+  it("refuses an SVG claiming to be an image, because it can carry an embedded script", async () => {
+    await expect(fetchRemoteMedia("https://cdn.partner.example/x.svg", "image", {
+      ...policy,
+      fetch: respondWith("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>", "image/svg+xml")
+    })).rejects.toMatchObject({ code: "media_type_mismatch" });
+  });
 });
 
 describe("controlled media storage", () => {

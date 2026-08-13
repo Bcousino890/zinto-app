@@ -17,18 +17,27 @@ export interface MediaFetchPolicy {
 }
 
 /**
- * A document may be almost anything, so it is defined by what it must not be:
- * markup and scripts are refused because the engine and its downstream clients
- * would be handing an active payload to a recipient.
+ * A document may be almost anything (pdf, docx, csv, ...), so it is defined by
+ * what it must not be: markup and scripts are refused because the engine and
+ * its downstream clients would be handing an active payload to a recipient.
+ *
+ * Image, video and audio are narrow enough kinds that an allowlist is safer
+ * than a prefix match — `startsWith("image/")` would also accept
+ * `image/svg+xml`, and an SVG can carry an embedded `<script>`.
  */
 const forbiddenDocumentTypes = ["text/html", "application/xhtml+xml", "text/javascript", "application/javascript"];
+const allowedTypesByKind: Record<Exclude<MediaKind, "document">, readonly string[]> = {
+  image: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+  video: ["video/mp4", "video/3gpp", "video/quicktime"],
+  audio: ["audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"]
+};
 
 function contentTypeMatches(kind: MediaKind, contentType: string): boolean {
   const normalized = contentType.split(";")[0]!.trim().toLowerCase();
   if (kind === "document") {
     return normalized !== "" && !forbiddenDocumentTypes.includes(normalized);
   }
-  return normalized.startsWith(`${kind}/`);
+  return allowedTypesByKind[kind].includes(normalized);
 }
 
 /**
