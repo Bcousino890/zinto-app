@@ -105,7 +105,7 @@ describe("OpenAPI partner contract", () => {
       conversationMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
       mediaStore: stub, pipelineMutationRepository: stub, pipelineRepository: stub,
-      webhookRepository: stub
+      taskMutationRepository: stub, webhookRepository: stub
     } as never);
     const registered = routesOf(app.printRoutes({ commonPrefix: false }));
     await app.close();
