@@ -72,10 +72,16 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
+// Registration now resolves DNS, so the suite states what each test hostname
+// answers instead of depending on the machine running the tests.
+const resolveTestHost = async (hostname: string): Promise<string[]> =>
+  hostname === "localhost" ? ["127.0.0.1"] : ["93.184.216.34"];
+
 async function makeApp() {
   const repository = new MemoryWebhooks();
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeys(),
+    hostResolver: resolveTestHost,
     logger: false,
     readOnly: false,
     webhookRepository: repository

@@ -8,6 +8,7 @@ import { DeliveryAdapterError } from "../delivery/client.js";
 import { assertSafeMediaUrl } from "../delivery/media-url.js";
 import { ApiError } from "../http/errors.js";
 import { type IdempotencyRepository, withIdempotency } from "../http/idempotency.js";
+import type { HostResolver } from "../net/destination.js";
 import type { ChannelResource, CoreRepository } from "../resources/core.js";
 
 const common = {
@@ -117,7 +118,8 @@ export function registerMessageSendRoutes(
   apiKeys: ApiKeyRepository,
   resources: CoreRepository,
   idempotency: IdempotencyRepository,
-  delivery: DeliveryClient
+  delivery: DeliveryClient,
+  resolveHost?: HostResolver
 ): void {
   const preHandler = protect(apiKeys);
 
@@ -138,7 +140,7 @@ export function registerMessageSendRoutes(
     const input = parse(mediaSchema, request.body);
     const selected = await selectChannel(resources, request.apiPrincipal!.companyId, Number(input.channel_id));
     ensureCapability(selected, "media");
-    await assertSafeMediaUrl(input.media_url);
+    await assertSafeMediaUrl(input.media_url, resolveHost);
     return performDelivery(request, reply, idempotency, delivery, {
       kind: "media",
       bearerToken: bearerToken(request),

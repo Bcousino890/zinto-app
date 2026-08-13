@@ -1,5 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { isIP } from "node:net";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -7,6 +6,7 @@ import { z } from "zod";
 import { createApiKeyAuthenticator, type ApiKeyRepository } from "../auth/api-key.js";
 import { assertScopes } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
+import { assertSafeDestination, type HostResolver } from "../net/destination.js";
 import type { WebhookRepository } from "../webhooks/repository.js";
 
 export const webhookEventTypes = [
@@ -33,10 +33,15 @@ function protect(apiKeys: ApiKeyRepository) {
   };
 }
 
-function assertSafeWebhookUrl(value: string): void {
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.username || url.password ||
-      url.hostname.toLowerCase() === "localhost" || isIP(url.hostname.replace(/^\[|\]$/g, "")) !== 0) {
+/**
+ * Registration resolves DNS instead of only inspecting the literal hostname, so
+ * a name that points at loopback or cloud metadata is refused at creation time
+ * rather than at the first delivery attempt.
+ */
+async function assertSafeWebhookUrl(value: string, resolve?: HostResolver): Promise<void> {
+  try {
+    await assertSafeDestination(value, { protocols: ["https:"], resolve });
+  } catch {
     throw new ApiError(400, "unsafe_webhook_url", "The webhook URL is not safe");
   }
 }
@@ -44,14 +49,15 @@ function assertSafeWebhookUrl(value: string): void {
 export function registerWebhookRoutes(
   app: FastifyInstance,
   apiKeys: ApiKeyRepository,
-  repository: WebhookRepository
+  repository: WebhookRepository,
+  resolveHost?: HostResolver
 ): void {
   const preHandler = protect(apiKeys);
 
   app.post("/api/v1/webhooks", { preHandler }, async (request, reply) => {
     const result = createSchema.safeParse(request.body);
     if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid");
-    assertSafeWebhookUrl(result.data.url);
+    await assertSafeWebhookUrl(result.data.url, resolveHost);
     const secret = `whsec_${randomBytes(32).toString("hex")}`;
     const endpoint = await repository.create(
       request.apiPrincipal!.companyId,

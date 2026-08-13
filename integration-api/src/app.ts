@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 
 import type { ApiKeyRepository } from "./auth/api-key.js";
 import type { DeliveryClient } from "./delivery/client.js";
+import type { HostResolver } from "./net/destination.js";
 import type { IdempotencyRepository } from "./http/idempotency.js";
 import type { ContactMutationRepository } from "./resources/contact-mutations.js";
 import type { WebhookRepository } from "./webhooks/repository.js";
@@ -20,6 +21,7 @@ export interface AppOptions {
   contactMutationRepository?: ContactMutationRepository;
   coreRepository?: CoreRepository;
   deliveryClient?: DeliveryClient;
+  hostResolver?: HostResolver;
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
   onClose?: () => Promise<void>;
@@ -102,11 +104,17 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         options.apiKeyRepository,
         options.coreRepository,
         options.idempotencyRepository,
-        options.deliveryClient
+        options.deliveryClient,
+        options.hostResolver
       );
     }
     if (options.webhookRepository !== undefined) {
-      registerWebhookRoutes(app, options.apiKeyRepository, options.webhookRepository);
+      registerWebhookRoutes(
+        app,
+        options.apiKeyRepository,
+        options.webhookRepository,
+        options.hostResolver
+      );
     }
   }
   if (options.onClose !== undefined) {
