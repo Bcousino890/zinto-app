@@ -24,6 +24,7 @@ const createContactSchema = z.object(contactFields).strict();
 const updateContactSchema = z.object({ ...contactFields, name: contactFields.name.optional() }).strict()
   .refine((value) => Object.keys(value).length > 0);
 const noteSchema = z.object({ content: z.string().trim().min(1).max(20_000) }).strict();
+const tagSchema = z.string().trim().min(1).max(100);
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
@@ -140,7 +141,7 @@ export function registerContactMutationRoutes(
     "/api/v1/contacts/:id/tags/:tag",
     { preHandler: protect(apiKeys, "tags:write", rateLimiter) },
     async (request) => {
-      const tag = z.string().trim().min(1).max(100).parse(request.params.tag);
+      const tag = parse(tagSchema, request.params.tag);
       const data = await repository.attachTag(
         request.apiPrincipal!.companyId,
         id(request.params.id, "contact"),
@@ -155,7 +156,7 @@ export function registerContactMutationRoutes(
     "/api/v1/contacts/:id/tags/:tag",
     { preHandler: protect(apiKeys, "tags:write", rateLimiter) },
     async (request) => {
-      const tag = z.string().trim().min(1).max(100).parse(request.params.tag);
+      const tag = parse(tagSchema, request.params.tag);
       const data = await repository.detachTag(
         request.apiPrincipal!.companyId,
         id(request.params.id, "contact"),

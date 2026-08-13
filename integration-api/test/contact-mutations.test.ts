@@ -347,4 +347,33 @@ describe("notes and tags", () => {
     expect(attach.json().data.tags).toEqual(["cliente-prioritario"]);
     expect(detach.json().data.tags).toEqual([]);
   });
+
+  it("rejects a whitespace-only tag with 400, not an unwrapped 500", async () => {
+    // Fastify's router itself rejects a route param over 100 chars (its
+    // default maxParamLength) with 414 before this handler ever runs, so an
+    // over-length tag can't reach it. A tag that trims to empty easily can:
+    // Zod's `.trim().min(1)` fails on it, and this route used to call
+    // `.parse()` directly instead of the file's own `parse()` helper, which
+    // would have let that ZodError fall through uncaught to the generic 500
+    // branch in src/http/errors.ts instead of a canonical validation_error.
+    const { app, contacts } = await makeApp();
+    const contact = await contacts.createContact(12, 4, { name: "Ana" });
+    const whitespaceOnly = "%20";
+
+    const attach = await app.inject({
+      method: "PUT",
+      url: `/api/v1/contacts/${contact.id}/tags/${whitespaceOnly}`,
+      headers: authHeaders
+    });
+    const detach = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/contacts/${contact.id}/tags/${whitespaceOnly}`,
+      headers: authHeaders
+    });
+
+    expect(attach.statusCode).toBe(400);
+    expect(attach.json().error.code).toBe("validation_error");
+    expect(detach.statusCode).toBe(400);
+    expect(detach.json().error.code).toBe("validation_error");
+  });
 });
