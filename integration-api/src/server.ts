@@ -9,6 +9,7 @@ import { secureLoggerOptions } from "./http/logging.js";
 import { RateLimiter } from "./http/rate-limit.js";
 import { DownloadingMediaProxy } from "./media/proxy.js";
 import { FilesystemMediaStore } from "./media/store.js";
+import { MetricsRegistry, PostgresMetricsQueries } from "./http/metrics.js";
 import { PostgresCoreRepository } from "./resources/core.js";
 import { PostgresContactMutationRepository } from "./resources/contact-mutations.js";
 import { PostgresConversationMutationRepository } from "./resources/conversation-mutations.js";
@@ -33,6 +34,11 @@ async function start(): Promise<void> {
     void mediaStore.purge(new Date(Date.now() - config.MEDIA_RETENTION_MINUTES * 60_000));
   }, 60_000);
   mediaPurge?.unref();
+  // Both undefined unless METRICS_ENABLED is true, which is what keeps
+  // GET /internal/metrics from being registered at all (src/app.ts) - see
+  // docs/api/METRICS-2026-08-13.md for why this ships off by default.
+  const metricsRegistry = config.METRICS_ENABLED ? new MetricsRegistry() : undefined;
+  const metricsQueries = config.METRICS_ENABLED ? new PostgresMetricsQueries(pool) : undefined;
   const app = await buildApp({
     apiKeyRepository: new PostgresApiKeyRepository(pool),
     contactMutationRepository: new PostgresContactMutationRepository(pool),
@@ -47,6 +53,8 @@ async function start(): Promise<void> {
       timeoutMs: config.LEGACY_DELIVERY_TIMEOUT_MS
     }),
     mediaStore,
+    metricsQueries,
+    metricsRegistry,
     pipelineMutationRepository: new PostgresPipelineMutationRepository(pool),
     pipelineRepository: new PostgresPipelineRepository(pool),
     onClose: async () => {

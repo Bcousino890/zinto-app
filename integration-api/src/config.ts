@@ -15,6 +15,21 @@ const configSchema = z.object({
   MEDIA_INTERNAL_BASE_URL: z.string().url().optional(),
   MEDIA_MAX_BYTES: z.coerce.number().int().min(1024).max(104_857_600).default(16_777_216),
   MEDIA_RETENTION_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
+  // Serves GET /internal/metrics (Prometheus text format: request latency and
+  // response counts per route from an in-memory registry, plus outbox lag /
+  // dead letters / duplicate deliveries queried from Postgres on demand - see
+  // src/http/metrics.ts). Off by default for the same reason MEDIA_PROXY_ENABLED
+  // is: the /internal/ prefix is only meant to be reachable from inside the
+  // Docker network, and as of this writing the reverse proxy rule that should
+  // deny it publicly (deploy/nginx-integration-api-preview.conf) has not been
+  // confirmed applied to the real production vhost - see
+  // docs/api/METRICS-2026-08-13.md. Unlike MEDIA_PROXY_ENABLED this flag has no
+  // required companion variable: it only needs the pool this service already
+  // requires via DATABASE_URL, so there is nothing extra to fail closed on -
+  // the safe default is simply that the route does not exist until this is
+  // turned on.
+  METRICS_ENABLED: z.enum(["true", "false"]).default("false")
+    .transform((value) => value === "true"),
   // Retention for the service's own bookkeeping tables (idempotency records,
   // the event outbox, and webhook delivery attempts) - see src/db/retention.ts
   // for the purge job and the reasoning behind each window.

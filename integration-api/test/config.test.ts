@@ -32,6 +32,11 @@ describe("safe deployment configuration", () => {
     expect(loadConfig(required).MEDIA_PROXY_ENABLED).toBe(false);
   });
 
+  it("keeps internal metrics disabled unless switched on explicitly, with no companion variable required", () => {
+    expect(loadConfig(required).METRICS_ENABLED).toBe(false);
+    expect(loadConfig({ ...required, METRICS_ENABLED: "true" }).METRICS_ENABLED).toBe(true);
+  });
+
   it("defaults the legacy delivery timeout to a bounded, reasonable value", () => {
     const config = loadConfig(required);
 
