@@ -11,13 +11,19 @@ La version `0.1.0` cubre:
 - identidad y permisos de la clave;
 - canales y capacidades de envio;
 - contactos, notas y etiquetas;
-- conversaciones e historial completo de mensajes;
+- conversaciones (lectura, y creacion o reutilizacion sin duplicar por
+  contacto+canal) e historial completo de mensajes, incluida lectura
+  individual de un mensaje por id y filtrado incremental por `updated_since`;
 - envio de texto, multimedia, plantillas e interactivos segun el canal;
+- lectura de pipelines, etapas, deals y tareas, y cambio de etapa de un deal
+  dentro de su mismo pipeline;
 - webhooks firmados para sincronizacion de cambios.
 
-Pipeline, oportunidades y tareas estan incluidos en el modelo de eventos, pero
-sus endpoints CRUD todavia no forman parte de `0.1.0`. No deben considerarse
-disponibles hasta que aparezcan en `openapi/openapi.yaml`.
+**Lo que todavia no existe** (verificar siempre contra
+`openapi/openapi.yaml`, que es la fuente de verdad, antes de asumir que algo
+esta disponible): creacion/edicion de deals y pipelines, escritura de tareas
+(solo lectura hoy), y movimiento de un deal entre pipelines distintos (el
+cambio de etapa disponible solo cubre etapas del mismo pipeline).
 
 ## URL base
 
