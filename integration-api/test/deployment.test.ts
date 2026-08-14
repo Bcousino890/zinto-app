@@ -28,8 +28,9 @@ describe("preview deployment artifacts", () => {
     const compose = await read("deploy/docker-compose.preview.yml");
 
     expect(compose).toContain('"127.0.0.1:3100:3100"');
-    expect(compose).toContain('READ_ONLY_MODE: "true"');
-    expect(compose).toContain('WEBHOOK_WORKER_ENABLED: "false"');
+    expect(compose).toContain("env_file:");
+    expect(compose).not.toContain("READ_ONLY_MODE:");
+    expect(compose).not.toContain("WEBHOOK_WORKER_ENABLED:");
     expect(compose).toContain("read_only: true");
     expect(compose).toContain("no-new-privileges:true");
     expect(compose).toContain("cap_drop:");

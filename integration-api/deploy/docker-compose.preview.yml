@@ -10,9 +10,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      READ_ONLY_MODE: "true"
-      WEBHOOK_WORKER_ENABLED: "false"
     ports:
       - "127.0.0.1:3100:3100"
     networks:
@@ -47,4 +44,3 @@ networks:
 
 volumes:
   zinto-media-storage: {}
-
