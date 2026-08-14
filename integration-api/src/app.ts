@@ -24,10 +24,8 @@ import type { CoreRepository } from "./resources/core.js";
 import type { PipelineMutationRepository } from "./resources/pipeline-mutations.js";
 import type { PipelineCrudRepository } from "./resources/pipeline-crud.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
-import type { FlowReadRepository } from "./resources/flow-reads.js";
-import type { ErpReadRepository } from "./resources/erp-read.js";
-import type { DealMutationRepository } from "./resources/deal-mutations.js";
-import type { TaskMutationRepository } from "./resources/task-mutations.js";
+import type { FlowRepository } from "./resources/flows.js";
+import type { ErpRepository } from "./resources/erp.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerConversationMutationRoutes } from "./routes/conversation-mutations.js";
@@ -35,10 +33,8 @@ import { registerMeRoute } from "./routes/me.js";
 import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
 import { registerPipelineCrudRoutes } from "./routes/pipeline-crud.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
-import { registerFlowReadRoutes } from "./routes/flow-reads.js";
-import { registerErpReadRoutes } from "./routes/erp-read.js";
-import { registerDealMutationRoutes } from "./routes/deal-mutations.js";
-import { registerTaskMutationRoutes } from "./routes/task-mutations.js";
+import { registerFlowRoutes } from "./routes/flows.js";
+import { registerErpRoutes } from "./routes/erp.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
@@ -49,6 +45,8 @@ export interface AppOptions {
   coreRepository?: CoreRepository;
   deliveryAuditRepository?: DeliveryAuditRepository;
   deliveryClient?: DeliveryClient;
+  erpRepository?: ErpRepository;
+  flowRepository?: FlowRepository;
   hostResolver?: HostResolver;
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
@@ -167,11 +165,11 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (options.pipelineRepository !== undefined) {
       registerPipelineRoutes(app, options.apiKeyRepository, options.pipelineRepository);
     }
-    if (options.flowReadRepository !== undefined) {
-      registerFlowReadRoutes(app, options.apiKeyRepository, options.flowReadRepository);
+    if (options.flowRepository !== undefined) {
+      registerFlowRoutes(app, options.apiKeyRepository, options.flowRepository);
     }
-    if (options.erpReadRepository !== undefined) {
-      registerErpReadRoutes(app, options.apiKeyRepository, options.erpReadRepository, rateLimiter);
+    if (options.erpRepository !== undefined) {
+      registerErpRoutes(app, options.apiKeyRepository, options.erpRepository);
     }
     if (options.pipelineMutationRepository !== undefined) {
       registerPipelineMutationRoutes(

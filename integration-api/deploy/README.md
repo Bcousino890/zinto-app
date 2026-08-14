@@ -71,3 +71,11 @@ To withdraw the preview entirely:
 4. Run `docker compose -f deploy/docker-compose.preview.yml down`.
 
 No database rollback is required because the preview applies no migration.
+
+## Write-enabled boundary
+
+This preview is not a write-enabled SmartBC deployment. Do not replace its
+GET-only Nginx policy, `READ_ONLY_MODE: "true"`, or
+`WEBHOOK_WORKER_ENABLED: "false"` until the release owner has completed
+`../docs/SMARTBC-READINESS-CHECKLIST.md`, including the security blockers and
+the migration/restore rehearsal.

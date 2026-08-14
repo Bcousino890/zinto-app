@@ -136,12 +136,6 @@ export class PostgresContactMutationRepository implements ContactMutationReposit
        VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
       [companyId, userId, eventType, resourceType, resourceId, JSON.stringify(payload)]
     );
-    await client.query(
-      `INSERT INTO integration_api_outbox
-         (company_id, event_type, resource_type, resource_id, payload)
-       VALUES ($1, $2, $3, $4, $5::jsonb)`,
-      [companyId, eventType, resourceType, resourceId, JSON.stringify(payload)]
-    );
   }
 
   async createContact(companyId: number, userId: number, input: ContactMutationInput) {

@@ -36,9 +36,17 @@ endpoint. Guardalo en un gestor de secretos.
   "type": "message.created",
   "schema_version": 1,
   "occurred_at": "2026-08-13T01:00:00.000Z",
-  "data": {}
+  "data": {
+    "id": "42",
+    "_meta": { "origin": "crm" }
+  }
 }
 ```
+
+`schema_version` procede de la fila del outbox y puede aumentar por tipo de
+evento. El consumidor debe seleccionar el parser por la pareja
+`(type, schema_version)`, no asumir siempre la version 1. `data._meta.origin`
+indica `crm`, `api` o `resync`; no es una garantia de identidad del usuario.
 
 Encabezados:
 
@@ -54,6 +62,15 @@ antes de parsear o procesar el JSON. Rechaza timestamps fuera de una tolerancia
 razonable, por ejemplo cinco minutos, y registra cada ID de evento para ignorar
 duplicados.
 
+Usa como clave HMAC el secreto `whsec_...` completo y comprueba tambien que
+`X-Zinto-Event-Id` coincide con `id` en el cuerpo. Un mensaje entrante se
+publica como `message.created` con `data.direction: "incoming"`; no existe un
+evento separado `message.received` en `0.1.0`.
+
+Todos los nombres aceptados por `event_types` tienen captura instalada por la
+migracion de eventos. Los triggers de familias ERP y Flows son condicionales:
+solo se crean cuando existe la tabla de origen correspondiente.
+
 ## Entrega y reintentos
 
 - Responde con cualquier estado `2xx` solo despues de guardar el evento.
@@ -62,6 +79,33 @@ duplicados.
 - Los fallos se reintentan con espera exponencial hasta 10 intentos.
 - El mismo evento puede entregarse mas de una vez.
 - El orden global entre eventos no esta garantizado.
+- Todos los intentos del mismo evento conservan cuerpo, `schema_version` y
+  `X-Zinto-Event-Id`; deduplica de forma duradera por ese ID.
+- La unicidad `(endpoint_id, outbox_id)` evita crear dos entregas logicas para
+  el mismo endpoint, pero un lease vencido puede producir dos solicitudes HTTP.
+
+## Eventos instalados
+
+- CRM: `contact.*`, `conversation.*`, `message.*`, `note.*`, `tag.*` y
+  `channel.connection.updated`.
+- Ventas: `deal.*`, `deal.stage.changed`, `pipeline.*` y `pipeline.stage.*`.
+- Tareas: `task.created`, `task.updated`, `task.completed` y `task.deleted`.
+- ERP operativo: `erp.product.*`, `erp.stock_level.*`,
+  `erp.stock_movement.*`, `erp.stock_transfer.*`, `erp.sales_order.*`,
+  `erp.supplier.*`, `erp.purchase_order.*`, `erp.invoice.*` y
+  `erp.invoice_payment.*`.
+- Flows: `flow.*` y `flow.execution.*`. Los payloads no incluyen `nodes`,
+  `edges`, `custom_variables`, `execution_path`, `context_data` ni errores
+  internos.
+
+Los comodines anteriores son abreviaturas documentales, no valores aceptados
+en `event_types`. Usa los nombres completos definidos por OpenAPI. Las
+actualizaciones que solo cambian `updated_at` no generan evento. Un cambio de
+etapa genera `deal.stage.changed` en lugar de `deal.updated`, y la primera
+transicion de una tarea a completada genera `task.completed`.
+
+Para recuperar entregas o reconciliar estado consulta
+[`REPLAY-RESYNC.md`](./REPLAY-RESYNC.md).
 
 El ejemplo `examples/webhook-receiver.ts` incluye verificacion de firma y
 proteccion basica contra replay.
@@ -90,10 +134,3 @@ tag agregado o quitado en esa misma sentencia. Actualizar tres tags en un solo
 
 En ambos casos, procesa cada evento de forma idempotente por `id` en vez de
 asumir una correspondencia 1:1 con la operacion que los origino.
-### Recuperacion de entregas
-
-Las entregas reclamadas tienen un token de lease. Si un worker muere, otra
-instancia puede reclamar una entrega cuyo lease haya expirado; el worker
-anterior no puede sobrescribir el resultado porque sus actualizaciones exigen
-el token vigente. La migracion `003_webhook_lease_tokens.sql` debe aplicarse
-antes de desplegar esta version.

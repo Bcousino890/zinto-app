@@ -199,6 +199,27 @@ describe("webhook endpoints", () => {
     expect(response.json().error.code).toBe("validation_error");
   });
 
+  it("accepts installed deal, pipeline, ERP, and Flow events", async () => {
+    const { app } = await makeApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/webhooks",
+      headers,
+      payload: {
+        url: "https://smartbc.example/webhook",
+        event_types: [
+          "deal.stage.changed",
+          "pipeline.stage.updated",
+          "task.completed",
+          "erp.invoice.updated",
+          "flow.execution.completed"
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+  });
+
   it("hides an endpoint belonging to another company", async () => {
     const { app, repository } = await makeApp();
     await repository.create(99, 99, {

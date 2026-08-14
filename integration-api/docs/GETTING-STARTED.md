@@ -15,15 +15,17 @@ La version `0.1.0` cubre:
   contacto+canal) e historial completo de mensajes, incluida lectura
   individual de un mensaje por id y filtrado incremental por `updated_since`;
 - envio de texto, multimedia, plantillas e interactivos segun el canal;
-- lectura de pipelines, etapas, deals y tareas, y cambio de etapa de un deal
-  dentro de su mismo pipeline;
+- pipelines, oportunidades y tareas;
+- metadatos, asignaciones y ejecuciones de Flows en solo lectura;
+- productos, existencias, pedidos de venta y facturas ERP en solo lectura;
 - webhooks firmados para sincronizacion de cambios.
 
-**Lo que todavia no existe** (verificar siempre contra
-`openapi/openapi.yaml`, que es la fuente de verdad, antes de asumir que algo
-esta disponible): creacion/edicion de deals y pipelines, escritura de tareas
-(solo lectura hoy), y movimiento de un deal entre pipelines distintos (el
-cambio de etapa disponible solo cubre etapas del mismo pipeline).
+Las escrituras de Flows y ERP no forman parte de `0.1.0`. El contrato listo, las
+exclusiones y el checklist de desbloqueo estan en
+`docs/FLOWS-ERP-SCOPE-CLOSURE.md`. Pipelines, oportunidades, tareas, ERP y
+Flows tambien estan incluidos en el modelo de eventos instalado. Las rutas de
+lectura publicadas en OpenAPI son la unica superficie disponible; no existen
+endpoints de escritura para Flows ni ERP en esta version.
 
 ## URL base
 
@@ -33,33 +35,23 @@ Durante la fase controlada en el VPS:
 https://crm.zinto.app/_integration-api
 ```
 
+El preview actual es solo lectura: Nginx solo admite `GET`, `HEAD` y `OPTIONS`,
+`READ_ONLY_MODE=true`, la migracion de Integration API no se aplica y el worker
+de webhooks permanece apagado. Por tanto, sirve para health, readiness y lecturas
+autenticadas; no permite crear contactos, registrar webhooks ni emitir eventos.
+No cambies esos limites para SmartBC hasta completar
+`docs/SMARTBC-READINESS-CHECKLIST.md`.
+
 Las rutas indicadas en OpenAPI se agregan a esa URL. Por ejemplo:
 
 ```text
 GET https://crm.zinto.app/_integration-api/api/v1/me
 ```
 
-## Apertura controlada de escrituras
-
-La API sigue naciendo en modo seguro: `READ_ONLY_MODE=true` bloquea todas las
-mutaciones (`POST`, `PATCH`, `PUT`, `DELETE`) bajo `/api/v1/`.
-
-Ahora existe una excepcion controlada para pilotos o partners autorizados: el
-operador puede habilitar escrituras solo para una lista cerrada de claves API o
-empresas mediante `WRITE_ENABLED_API_KEY_IDS` y/o `WRITE_ENABLED_COMPANY_IDS`.
-Si tu clave no esta en esa allowlist, seguiras recibiendo:
-
-```json
-{
-  "error": {
-    "code": "read_only_mode",
-    "message": "Write operations are temporarily disabled"
-  }
-}
-```
-
-Esto permite abrir un partner concreto sin abrir escrituras globales para el
-resto del sistema.
+La base de recursos REST completa es
+`https://crm.zinto.app/_integration-api/api/v1`. Consulta
+`docs/SMARTBC-COMPATIBILITY.md` para evitar duplicar el prefijo al configurar
+clientes que ya guardan `/api/v1` en su URL base.
 
 ## Primera llamada
 
@@ -83,7 +75,7 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
     "api_key": { "id": "12", "name": "Integracion ERP" },
     "scopes": ["contacts:read", "contacts:write"]
   },
-  "meta": { "request_id": "req-123" }
+  "meta": { "request_id": "req_123" }
 }
 ```
 
@@ -100,10 +92,12 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
 ## Contrato y ejemplos
 
 - Contrato machine-readable: `openapi/openapi.yaml`
+- Matriz de compatibilidad SmartBC: `docs/SMARTBC-COMPATIBILITY.md`
 - Autenticacion y permisos: `docs/AUTHENTICATION.md`
 - Paginacion: `docs/PAGINATION.md`
 - Reintentos seguros: `docs/IDEMPOTENCY.md`
 - Webhooks: `docs/WEBHOOKS.md`
 - Errores: `docs/ERRORS.md`
+- Cierre Flows/ERP: `docs/FLOWS-ERP-SCOPE-CLOSURE.md`
 - Cliente Node.js: `examples/node-client.ts`
 - Receptor de webhooks: `examples/webhook-receiver.ts`

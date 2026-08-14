@@ -28,7 +28,7 @@ async function deliver(
   const body = JSON.stringify({
     id: item.eventId,
     type: item.eventType,
-    schema_version: 1,
+    schema_version: item.schemaVersion,
     occurred_at: item.occurredAt,
     data: item.payload
   });
@@ -56,7 +56,12 @@ async function deliver(
       return;
     }
     const message = error instanceof Error ? error.message : "Webhook delivery failed";
-    await repository.markRetry(item.id, calculateNextAttempt(now, item.attemptCount, random()), message, item.leaseToken);
+    await repository.markRetry(
+      item.id,
+      item.leaseToken,
+      calculateNextAttempt(now, item.attemptCount, random()),
+      message
+    );
   }
 }
 

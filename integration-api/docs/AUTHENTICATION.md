@@ -1,7 +1,7 @@
 # Autenticacion y permisos
 
-Todas las operaciones excepto `GET /health` requieren una clave API en el
-encabezado `Authorization`:
+Todas las operaciones excepto `GET /health` y `GET /ready` requieren una clave
+API en el encabezado `Authorization`:
 
 ```http
 Authorization: Bearer pcp_<64 caracteres hexadecimales>
@@ -31,28 +31,25 @@ mediante parametros del cliente.
 | `notes:read` | Listar notas de un contacto |
 | `notes:write` | Crear, editar y borrar notas |
 | `tags:write` | Asociar y quitar etiquetas |
-| `pipelines:read` | Leer pipelines y etapas |
-| `pipelines:write` | Crear, editar y borrar pipelines y etapas |
-| `deals:read` | Leer deals |
-| `deals:write` | Crear, editar, borrar y mover deals |
-| `tasks:read` | Leer tareas |
-| `tasks:write` | Crear, editar y borrar tareas |
-| `flows:read` | Leer flows, sesiones, ejecuciones y plantillas |
-| `erp:read` | Leer recursos ERP publicados |
-| `inventory:read` | Leer almacenes y stock junto con `erp:read` |
+| `pipelines:read` | Leer pipelines y sus etapas |
+| `deals:read` | Leer oportunidades |
+| `deals:write` | Cambiar la etapa de una oportunidad |
+| `tasks:read` | Leer tareas de contactos |
+| `conversations:write` | Crear o reencontrar conversaciones uno-a-uno |
+| `flows:read` | Leer metadatos, asignaciones y ejecuciones seguras de Flows |
+| `erp.products:read` | Leer productos ERP seguros |
+| `erp.inventory:read` | Leer niveles de existencias ERP |
+| `erp.sales-orders:read` | Leer cabeceras de pedidos de venta ERP |
+| `erp.invoices:read` | Leer cabeceras de facturas ERP |
 | `webhooks:manage` | Registrar, listar y desactivar webhooks |
 | `*` | Acceso completo; reservar para administracion controlada |
 
 `GET /api/v1/me` devuelve los scopes efectivos. Si falta alguno, la API
 responde `403 insufficient_scope`.
 
-Los scopes no sustituyen la compuerta operativa de escritura. Aunque una clave
-tenga permisos como `contacts:write` o `messages:send`, Zinto puede mantener
-las escrituras globalmente cerradas con `READ_ONLY_MODE=true`. Desde el 13 de
-agosto de 2026 existe una excepcion controlada: el operador puede permitir
-escrituras solo a claves API o empresas concretas mediante
-`WRITE_ENABLED_API_KEY_IDS` y `WRITE_ENABLED_COMPANY_IDS`, sin abrir al resto
-de partners.
+El contrato OpenAPI declara el permiso exacto de cada operacion mediante
+`x-required-scopes`. La matriz completa para SmartBC esta en
+`docs/SMARTBC-COMPATIBILITY.md`.
 
 ## Custodia de claves
 

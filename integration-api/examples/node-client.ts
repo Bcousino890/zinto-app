@@ -1,10 +1,16 @@
-const baseUrl = process.env.ZINTO_API_URL ?? "https://crm.zinto.app/_integration-api";
+const configuredBaseUrl = process.env.ZINTO_API_URL ??
+  "https://crm.zinto.app/_integration-api/api/v1";
 const apiKey = process.env.ZINTO_API_KEY;
 
 if (!apiKey) throw new Error("ZINTO_API_KEY is required");
 
+const serviceOrApiBase = configuredBaseUrl.replace(/\/+$/, "");
+const apiBaseUrl = serviceOrApiBase.endsWith("/api/v1")
+  ? serviceOrApiBase
+  : `${serviceOrApiBase}/api/v1`;
+
 async function zinto<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${apiKey}`,
@@ -17,10 +23,13 @@ async function zinto<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-const identity = await zinto("/api/v1/me");
+const identity = await zinto("/me");
 console.log("identity", identity);
 
-const contact = await zinto("/api/v1/contacts", {
+const existingContacts = await zinto("/contacts?limit=50");
+console.log("contacts", existingContacts);
+
+const contact = await zinto("/contacts", {
   method: "POST",
   headers: { "idempotency-key": crypto.randomUUID() },
   body: JSON.stringify({
@@ -32,12 +41,12 @@ const contact = await zinto("/api/v1/contacts", {
 console.log("contact", contact);
 
 const channels = await zinto<{ data: Array<{ id: string; capabilities: string[] }> }>(
-  "/api/v1/channels"
+  "/channels"
 );
 const textChannel = channels.data.find((channel) => channel.capabilities.includes("text"));
 
 if (textChannel) {
-  const message = await zinto("/api/v1/messages/send", {
+  const message = await zinto("/messages/send", {
     method: "POST",
     headers: { "idempotency-key": crypto.randomUUID() },
     body: JSON.stringify({
@@ -49,3 +58,4 @@ if (textChannel) {
   console.log("message", message);
 }
 
+export {};

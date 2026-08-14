@@ -133,8 +133,8 @@ Error response:
 - `2xx` acknowledges delivery. Timeouts and non-`2xx` responses are retried with
   exponential backoff and jitter.
 - Dead-lettered deliveries remain visible and can be replayed.
-- Events are at-least-once and ordered per company where feasible; consumers
-  must be idempotent.
+- Events are at-least-once and are not globally ordered; consumers must be
+  idempotent and use entity timestamps/version fields when ordering matters.
 
 Initial event families:
 
@@ -144,8 +144,17 @@ Initial event families:
 - `note.created`, `note.updated`, `note.deleted`
 - `tag.attached`, `tag.detached`
 - `deal.created`, `deal.updated`, `deal.stage.changed`, `deal.deleted`
+- `pipeline.created`, `pipeline.updated`, `pipeline.deleted`
+- `pipeline.stage.created`, `pipeline.stage.updated`, `pipeline.stage.deleted`
 - `task.created`, `task.updated`, `task.completed`, `task.deleted`
 - `channel.connection.updated`
+- operational `erp.product.*`, `erp.stock_level.*`, `erp.stock_movement.*`,
+  `erp.stock_transfer.*`, `erp.sales_order.*`, `erp.supplier.*`,
+  `erp.purchase_order.*`, `erp.invoice.*`, and `erp.invoice_payment.*`
+- `flow.created`, `flow.updated`, `flow.deleted`, and `flow.execution.*`
+
+The wildcards above abbreviate event families in this design document. Public
+subscriptions use only the complete values enumerated in OpenAPI.
 
 ## Resource coverage
 

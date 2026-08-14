@@ -50,4 +50,17 @@ describe("preview deployment artifacts", () => {
 
     expect(nginx).toMatch(/location \^~ \/_integration-api\/internal\/ \{\s*deny all;/);
   });
+
+  it("documents that SmartBC write activation is separate from the read-only preview", async () => {
+    const gettingStarted = await read("docs/GETTING-STARTED.md");
+    const compatibility = await read("docs/SMARTBC-COMPATIBILITY.md");
+    const checklist = await read("docs/SMARTBC-READINESS-CHECKLIST.md");
+
+    expect(gettingStarted).toContain("solo lectura");
+    expect(compatibility).toContain("migracion aplicada y worker habilitado");
+    expect(checklist).toContain("company_id=3");
+    expect(checklist).toContain("READ_ONLY_MODE=true");
+    expect(checklist).toContain("WEBHOOK_WORKER_ENABLED=false");
+    expect(checklist).toContain("No hay migracion down automatica");
+  });
 });
