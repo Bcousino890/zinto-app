@@ -24,8 +24,7 @@ BEGIN
     event_type := 'task.updated';
   END IF;
 
-  INSERT INTO integration_api_outbox (company_id, event_type, resource_type, resource_id, payload)
-  VALUES (event_company_id, event_type, 'task', task_row.id,
+  PERFORM integration_api_enqueue_event(event_company_id, event_type, 'task', task_row.id,
     jsonb_build_object(
       'id', task_row.id::text, 'contact_id', task_row.contact_id::text,
       'title', task_row.title, 'description', task_row.description,
@@ -40,7 +39,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- 003 already installs a task trigger.  Use its canonical name so this
+-- migration replaces that trigger instead of leaving two writers attached to
+-- contact_tasks and emitting every CRM task event twice.
+DROP TRIGGER IF EXISTS integration_api_tasks_outbox ON contact_tasks;
 DROP TRIGGER IF EXISTS integration_api_contact_tasks_outbox ON contact_tasks;
-CREATE TRIGGER integration_api_contact_tasks_outbox
+CREATE TRIGGER integration_api_tasks_outbox
 AFTER INSERT OR UPDATE OR DELETE ON contact_tasks
 FOR EACH ROW EXECUTE FUNCTION integration_api_capture_task_event();
