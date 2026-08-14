@@ -1,5 +1,5 @@
-import { createSafeFetch } from "../net/safe-fetch.js";
 import type { ClaimedWebhookDelivery, WebhookDeliveryRepository } from "./deliveries.js";
+import { secureWebhookFetch } from "./http-client.js";
 import { signWebhook } from "./signature.js";
 
 const maxAttempts = 10;
@@ -11,12 +11,6 @@ export function calculateNextAttempt(now: Date, attemptCount: number, jitter: nu
 }
 
 type Fetcher = (request: Request) => Promise<Response>;
-
-/**
- * Deliveries never use the global fetch: the endpoint URL is partner-controlled
- * and could have been repointed at an internal address after registration.
- */
-const safeFetch: Fetcher = createSafeFetch({ timeoutMs: 15_000 });
 
 async function deliver(
   item: ClaimedWebhookDelivery,
@@ -67,7 +61,7 @@ async function deliver(
 
 export async function dispatchBatch(
   repository: WebhookDeliveryRepository,
-  fetcher: Fetcher = safeFetch,
+  fetcher: Fetcher = secureWebhookFetch,
   now: Date = new Date(),
   random: () => number = Math.random
 ): Promise<number> {

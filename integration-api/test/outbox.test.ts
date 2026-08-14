@@ -1,4 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const dns = vi.hoisted(() => ({
+  lookup: vi.fn()
+}));
+const network = vi.hoisted(() => ({
+  connectedAddresses: [] as string[],
+  connectedFamilies: [] as number[],
+  request: vi.fn(),
+  responses: [] as Array<{ status: number; location?: string }>
+}));
+
+vi.mock("node:dns/promises", () => dns);
+vi.mock("node:https", () => ({ request: network.request }));
 
 import { calculateNextAttempt, dispatchBatch } from "../src/webhooks/dispatcher.js";
 import type {
@@ -19,6 +35,65 @@ class MemoryDeliveries implements WebhookDeliveryRepository {
     this.retried.push({ id, nextAttemptAt, error });
   }
   async markDead(id: string, leaseToken: string) { this.dead.push(`${id}:${leaseToken}`); }
+}
+
+beforeEach(() => {
+  dns.lookup.mockReset();
+  network.connectedAddresses.length = 0;
+  network.connectedFamilies.length = 0;
+  network.responses.length = 0;
+  network.request.mockReset();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function usePinnedHttpsNetwork(): void {
+  network.request.mockImplementation((url: URL, options: Record<string, unknown>, callback: (response: PassThrough) => void) => {
+    const request = new EventEmitter() as EventEmitter & {
+      destroy(error?: Error): void;
+      end(body?: Buffer): void;
+    };
+    request.destroy = (error?: Error) => {
+      if (error !== undefined) request.emit("error", error);
+    };
+    request.end = () => {
+      const fixedLookup = options.lookup as (
+        hostname: string,
+        lookupOptions: Record<string, unknown>,
+        done: (
+          error: Error | null,
+          address: string | Array<{ address: string; family: number }>,
+          family?: number
+        ) => void
+      ) => void;
+      fixedLookup(url.hostname, { all: true }, (error, result, family) => {
+        if (error !== null) {
+          request.emit("error", error);
+          return;
+        }
+        const resolved = Array.isArray(result) ? result[0] : { address: result, family: family! };
+        if (resolved === undefined) {
+          request.emit("error", new Error("Pinned lookup returned no address"));
+          return;
+        }
+        network.connectedAddresses.push(resolved.address);
+        network.connectedFamilies.push(resolved.family);
+        const configured = network.responses.shift() ?? { status: 204 };
+        const response = new PassThrough() as PassThrough & {
+          headers: Record<string, string>;
+          statusCode: number;
+        };
+        response.statusCode = configured.status;
+        response.headers = configured.location === undefined ? {} : { location: configured.location };
+        callback(response);
+        response.end();
+      });
+    };
+    return request;
+  });
 }
 
 describe("webhook delivery dispatcher", () => {
@@ -123,6 +198,132 @@ describe("webhook delivery dispatcher", () => {
       { eventId: delivery.eventId, body: expect.objectContaining({ id: delivery.eventId, schema_version: 2 }) },
       { eventId: delivery.eventId, body: expect.objectContaining({ id: delivery.eventId, schema_version: 2 }) }
     ]);
+  });
+
+  it("rejects a private DNS answer at delivery time before opening a connection", async () => {
+    const repository = new MemoryDeliveries();
+    repository.deliveries.push({
+      id: "8",
+      leaseToken: "lease-8",
+      eventId: "evt_8",
+      eventType: "message.created",
+      schemaVersion: 1,
+      attemptCount: 1,
+      occurredAt: "2026-08-13T14:00:00.000Z",
+      payload: { id: "701" },
+      secret: "whsec_test",
+      url: "https://rebind.example/webhook"
+    });
+    dns.lookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+    usePinnedHttpsNetwork();
+
+    await dispatchBatch(repository, undefined, new Date("2026-08-13T14:01:00.000Z"), () => 0);
+
+    expect(repository.delivered).toEqual([]);
+    expect(repository.retried.map(({ id }) => id)).toEqual(["8"]);
+    expect(network.connectedAddresses).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { address: "93.184.216.34", family: 4 },
+    { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 }
+  ])("pins the HTTPS connection to the authorized $family-bit DNS address", async (resolved) => {
+    const repository = new MemoryDeliveries();
+    repository.deliveries.push({
+      id: "9",
+      leaseToken: "lease-9",
+      eventId: "evt_9",
+      eventType: "message.created",
+      schemaVersion: 1,
+      attemptCount: 1,
+      occurredAt: "2026-08-13T14:00:00.000Z",
+      payload: { id: "701" },
+      secret: "whsec_test",
+      url: "https://rebind.example/webhook"
+    });
+    dns.lookup
+      .mockResolvedValueOnce([resolved])
+      .mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
+    network.responses.push({ status: 204 });
+    usePinnedHttpsNetwork();
+
+    await dispatchBatch(repository, undefined, new Date("2026-08-13T14:01:00.000Z"), () => 0);
+
+    expect(network.connectedAddresses).toEqual([resolved.address]);
+    expect(network.connectedFamilies).toEqual([resolved.family]);
+    expect(dns.lookup).toHaveBeenCalledTimes(1);
+    expect(repository.delivered).toEqual(["9:lease-9"]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([301, 302, 303, 307, 308])(
+    "reauthorizes a %i redirect and blocks its private IPv6 destination",
+    async (redirectStatus) => {
+      const repository = new MemoryDeliveries();
+      repository.deliveries.push({
+        id: "10",
+        leaseToken: "lease-10",
+        eventId: "evt_10",
+        eventType: "message.created",
+        schemaVersion: 1,
+        attemptCount: 1,
+        occurredAt: "2026-08-13T14:00:00.000Z",
+        payload: { id: "701" },
+        secret: "whsec_test",
+        url: "https://first.example/webhook"
+      });
+      dns.lookup
+        .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+        .mockResolvedValueOnce([{ address: "fd00::10", family: 6 }]);
+      network.responses.push({ status: redirectStatus, location: "https://redirect.example/internal" });
+      usePinnedHttpsNetwork();
+
+      await dispatchBatch(repository, undefined, new Date("2026-08-13T14:01:00.000Z"), () => 0);
+
+      expect(dns.lookup).toHaveBeenCalledTimes(2);
+      expect(network.connectedAddresses).toEqual(["93.184.216.34"]);
+      expect(repository.delivered).toEqual([]);
+      expect(repository.retried.map(({ id }) => id)).toEqual(["10"]);
+    }
+  );
+
+  it("follows a redirect chain when every IPv4 and IPv6 destination is public", async () => {
+    const repository = new MemoryDeliveries();
+    repository.deliveries.push({
+      id: "11",
+      leaseToken: "lease-11",
+      eventId: "evt_11",
+      eventType: "message.created",
+      schemaVersion: 1,
+      attemptCount: 1,
+      occurredAt: "2026-08-13T14:00:00.000Z",
+      payload: { id: "701" },
+      secret: "whsec_test",
+      url: "https://first.example/webhook"
+    });
+    dns.lookup
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValueOnce([{
+        address: "2606:2800:220:1:248:1893:25c8:1946",
+        family: 6
+      }]);
+    network.responses.push(
+      { status: 307, location: "https://second.example/webhook" },
+      { status: 204 }
+    );
+    usePinnedHttpsNetwork();
+
+    await dispatchBatch(repository, undefined, new Date("2026-08-13T14:01:00.000Z"), () => 0);
+
+    expect(dns.lookup).toHaveBeenCalledTimes(2);
+    expect(network.connectedAddresses).toEqual([
+      "93.184.216.34",
+      "2606:2800:220:1:248:1893:25c8:1946"
+    ]);
+    expect(network.connectedFamilies).toEqual([4, 6]);
+    expect(repository.delivered).toEqual(["11:lease-11"]);
+    expect(repository.retried).toEqual([]);
   });
 });
 

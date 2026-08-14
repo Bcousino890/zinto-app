@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const dns = vi.hoisted(() => ({
+  lookup: vi.fn()
+}));
+
+vi.mock("node:dns/promises", () => dns);
 
 import { buildApp } from "../src/app.js";
 import type { ApiKeyRecord, ApiKeyRepository } from "../src/auth/api-key.js";
@@ -70,18 +76,25 @@ class MemoryWebhooks implements WebhookRepository {
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
+  dns.lookup.mockReset();
 });
 
 // Registration now resolves DNS, so the suite states what each test hostname
 // answers instead of depending on the machine running the tests.
-const resolveTestHost = async (hostname: string): Promise<string[]> =>
-  hostname === "localhost" ? ["127.0.0.1"] : ["93.184.216.34"];
+const resolveTestHost = async (hostname: string): Promise<string[]> => {
+  const values = await dns.lookup(hostname, { all: true, verbatim: true });
+  return values.map((value: { address: string }) => value.address);
+};
 
 async function makeApp(options: {
   readOnly?: boolean;
   writeEnabledApiKeyIds?: number[];
   writeEnabledCompanyIds?: number[];
 } = {}) {
+  dns.lookup.mockResolvedValue([
+    { address: "93.184.216.34", family: 4 },
+    { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 }
+  ]);
   const repository = new MemoryWebhooks();
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeys(),
@@ -184,6 +197,58 @@ describe("webhook endpoints", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe("unsafe_webhook_url");
+  });
+
+  it.each([
+    { address: "0.0.0.0", family: 4 },
+    { address: "10.0.0.7", family: 4 },
+    { address: "100.64.0.7", family: 4 },
+    { address: "127.0.0.1", family: 4 },
+    { address: "169.254.169.254", family: 4 },
+    { address: "172.16.0.7", family: 4 },
+    { address: "192.168.0.7", family: 4 },
+    { address: "198.51.100.9", family: 4 },
+    { address: "224.0.0.7", family: 4 },
+    { address: "::", family: 6 },
+    { address: "::1", family: 6 },
+    { address: "::ffff:127.0.0.1", family: 6 },
+    { address: "fd00::7", family: 6 },
+    { address: "fe80::7", family: 6 },
+    { address: "ff02::1", family: 6 },
+    { address: "2001:db8::7", family: 6 }
+  ])("rejects a webhook hostname resolving to $address", async (resolved) => {
+    const { app, repository } = await makeApp();
+    dns.lookup.mockResolvedValue([resolved]);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/webhooks",
+      headers,
+      payload: { url: "https://rebind.example/webhook", event_types: ["message.created"] }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("unsafe_webhook_url");
+    expect(repository.endpoints.size).toBe(0);
+  });
+
+  it("rejects a mixed DNS answer if any IPv4 or IPv6 address is not public", async () => {
+    const { app, repository } = await makeApp();
+    dns.lookup.mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+      { address: "fc00::1", family: 6 }
+    ]);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/webhooks",
+      headers,
+      payload: { url: "https://mixed.example/webhook", event_types: ["message.created"] }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("unsafe_webhook_url");
+    expect(repository.endpoints.size).toBe(0);
   });
 
   it("rejects unsupported event types", async () => {

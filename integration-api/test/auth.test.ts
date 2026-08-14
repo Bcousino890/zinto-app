@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import type { FastifyServerOptions } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
@@ -8,10 +9,16 @@ import {
   type ApiKeyRecord,
   type ApiKeyRepository
 } from "../src/auth/api-key.js";
+import { loadConfig } from "../src/config.js";
 
 const rawKey = `pcp_${"a".repeat(64)}`;
 const keyHash = createHash("sha256").update(rawKey.slice(4)).digest("hex");
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
+const requiredConfig = {
+  DATABASE_URL: "postgres://zinto:test@db:5432/zinto",
+  LEGACY_API_URL: "http://legacy:9000",
+  WEBHOOK_ENCRYPTION_KEY: "a".repeat(64)
+};
 
 class MemoryApiKeyRepository implements ApiKeyRepository {
   constructor(private readonly record: ApiKeyRecord | null) {}
@@ -40,10 +47,14 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-async function makeApp(record: ApiKeyRecord | null) {
+async function makeApp(
+  record: ApiKeyRecord | null,
+  trustProxy: FastifyServerOptions["trustProxy"] = false
+) {
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeyRepository(record),
-    logger: false
+    logger: false,
+    trustProxy
   });
   apps.push(app);
   return app;
@@ -132,6 +143,72 @@ describe("API-key authentication", () => {
     });
 
     expectApiError(response, 403, "ip_not_allowed", "This IP address is not allowed");
+  });
+
+  it("rejects an allowlisted IP prepended by the client to X-Forwarded-For", async () => {
+    const { TRUST_PROXY } = loadConfig({
+      ...requiredConfig,
+      TRUST_PROXY: "127.0.0.1/32"
+    });
+    const app = await makeApp(
+      { ...validRecord, allowedIps: ["203.0.113.10"] },
+      TRUST_PROXY
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${rawKey}`,
+        "x-forwarded-for": "203.0.113.10, 198.51.100.4"
+      },
+      remoteAddress: "127.0.0.1"
+    });
+
+    expectApiError(response, 403, "ip_not_allowed", "This IP address is not allowed");
+  });
+
+  it("ignores X-Forwarded-For from a peer that is not a trusted proxy", async () => {
+    const { TRUST_PROXY } = loadConfig({
+      ...requiredConfig,
+      TRUST_PROXY: "127.0.0.1/32"
+    });
+    const app = await makeApp(
+      { ...validRecord, allowedIps: ["203.0.113.10"] },
+      TRUST_PROXY
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${rawKey}`,
+        "x-forwarded-for": "203.0.113.10"
+      },
+      remoteAddress: "198.51.100.4"
+    });
+
+    expectApiError(response, 403, "ip_not_allowed", "This IP address is not allowed");
+  });
+
+  it("accepts the client IP replaced by a trusted proxy", async () => {
+    const { TRUST_PROXY } = loadConfig({
+      ...requiredConfig,
+      TRUST_PROXY: "127.0.0.1/32"
+    });
+    const app = await makeApp(
+      { ...validRecord, allowedIps: ["203.0.113.10"] },
+      TRUST_PROXY
+    );
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${rawKey}`,
+        "x-forwarded-for": "203.0.113.10"
+      },
+      remoteAddress: "127.0.0.1"
+    });
+
+    expect(response.statusCode).toBe(200);
   });
 
   it("returns tenant identity and scopes without key material", async () => {

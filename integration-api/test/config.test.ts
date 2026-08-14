@@ -14,6 +14,7 @@ describe("safe deployment configuration", () => {
     const config = loadConfig(required);
 
     expect(config.READ_ONLY_MODE).toBe(true);
+    expect(config.TRUST_PROXY).toBe(false);
     expect(config.WEBHOOK_WORKER_ENABLED).toBe(false);
   });
 
@@ -169,4 +170,20 @@ describe("safe deployment configuration", () => {
     expect(() => loadConfig({ ...required, WEBHOOK_DELIVERY_RETENTION_DAYS: "0" })).toThrow();
     expect(() => loadConfig({ ...required, WEBHOOK_DELIVERY_RETENTION_DAYS: "181" })).toThrow();
   });
+
+  it("returns only explicitly configured trusted proxy addresses", () => {
+    const config = loadConfig({
+      ...required,
+      TRUST_PROXY: "127.0.0.1/32, ::1/128"
+    });
+
+    expect(config.TRUST_PROXY).toEqual(["127.0.0.1/32", "::1/128"]);
+  });
+
+  it.each(["true", "127.0.0.1/33", "not-an-ip"])(
+    "rejects an unsafe trusted proxy value: %s",
+    (TRUST_PROXY) => {
+      expect(() => loadConfig({ ...required, TRUST_PROXY })).toThrow();
+    }
+  );
 });

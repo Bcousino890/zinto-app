@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { ApiError } from "../http/errors.js";
 import type { RateLimiter } from "../http/rate-limit.js";
 import { assertSafeDestination, type HostResolver } from "../net/destination.js";
 import { webhookEventTypes } from "../webhooks/event-types.js";
+import { authorizeWebhookUrl, UnsafeWebhookUrlError, type WebhookResolver } from "../webhooks/http-client.js";
 import type { WebhookRepository } from "../webhooks/repository.js";
 
 export { webhookEventTypes } from "../webhooks/event-types.js";
@@ -50,8 +52,15 @@ function protectWrite(
  */
 async function assertSafeWebhookUrl(value: string, resolve?: HostResolver): Promise<void> {
   try {
-    await assertSafeDestination(value, { protocols: ["https:"], resolve });
-  } catch {
+    const resolver: WebhookResolver | undefined = resolve === undefined
+      ? undefined
+      : async (hostname) => (await resolve(hostname)).map((address) => ({
+        address,
+        family: isIP(address)
+      }));
+    await authorizeWebhookUrl(value, resolver);
+  } catch (error) {
+    if (!(error instanceof UnsafeWebhookUrlError)) throw error;
     throw new ApiError(400, "unsafe_webhook_url", "The webhook URL is not safe");
   }
 }

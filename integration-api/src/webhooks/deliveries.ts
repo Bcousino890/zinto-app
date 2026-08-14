@@ -33,7 +33,6 @@ interface DeliveryRow {
   payload: unknown;
   encrypted_secret: string;
   url: string;
-  lease_token: string | null;
 }
 
 export class PostgresWebhookDeliveryRepository implements WebhookDeliveryRepository {
@@ -64,6 +63,7 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
              JOIN integration_api_webhook_endpoints endpoints
                ON endpoints.company_id = outbox.company_id
               AND endpoints.active = TRUE
+              AND outbox.occurred_at >= endpoints.created_at
               AND (cardinality(endpoints.event_types) = 0 OR outbox.event_type = ANY(endpoints.event_types))
            ON CONFLICT (endpoint_id, outbox_id) DO NOTHING
            RETURNING outbox_id
@@ -76,6 +76,19 @@ export class PostgresWebhookDeliveryRepository implements WebhookDeliveryReposit
       // The same time predicate has to appear here too. Without it, an event
       // older than every endpoint would look "interesting" to this check, never
       // get a delivery row, and stay unprocessed forever.
+      await client.query(
+        `UPDATE integration_api_outbox
+            SET processed_at = NOW()
+          WHERE processed_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+                FROM integration_api_webhook_endpoints endpoints
+               WHERE endpoints.company_id = integration_api_outbox.company_id
+                 AND endpoints.active = TRUE
+                 AND integration_api_outbox.occurred_at >= endpoints.created_at
+                 AND (cardinality(endpoints.event_types) = 0 OR integration_api_outbox.event_type = ANY(endpoints.event_types))
+            )`
+      );
       await client.query(
         `UPDATE integration_api_webhook_deliveries deliveries
             SET status = 'dead', lease_expires_at = NULL, lease_token = NULL, updated_at = NOW(),

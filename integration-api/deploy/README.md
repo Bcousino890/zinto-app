@@ -15,6 +15,19 @@ mutations through Nginx.
 - aaPanel auto-loads the snippet from
   `/www/server/panel/vhost/nginx/extension/crm.zinto.app/`.
 
+## Trusted client IP
+
+Nginx replaces `X-Forwarded-For` with the connection's `$remote_addr`; it must
+not append a client-supplied header. The API accepts `TRUST_PROXY=false` or a
+comma-separated list of exact proxy IPs/CIDRs, never `true`.
+
+Start the preview with `TRUST_PROXY=false`, request `/health` through Nginx,
+and inspect the API log's `remoteAddress`. Set `TRUST_PROXY` to that exact
+address (`/32` for IPv4 or `/128` for IPv6), then recreate the container. This
+may be the Docker network gateway rather than `127.0.0.1`; do not trust the
+whole private subnet. Repeat the request after enabling trust and confirm the
+log now reports the real client IP.
+
 ## Build and deploy
 
 `GIT_COMMIT` is required: it is stamped into the image so a running container

@@ -96,117 +96,6 @@ paths:
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/erp/products:
-    get:
-      tags: [ERP]
-      operationId: listErpProducts
-      summary: List company products
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated products }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/inventory/warehouses:
-    get:
-      tags: [ERP]
-      operationId: listErpWarehouses
-      summary: List company warehouses
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated warehouses }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/inventory/stock-levels:
-    get:
-      tags: [ERP]
-      operationId: listErpStockLevels
-      summary: List company stock levels
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated stock levels }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/suppliers:
-    get:
-      tags: [ERP]
-      operationId: listErpSuppliers
-      summary: List company suppliers
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated suppliers }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/sales-orders:
-    get:
-      tags: [ERP]
-      operationId: listErpSalesOrders
-      summary: List company sales orders
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated sales orders }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/purchase-orders:
-    get:
-      tags: [ERP]
-      operationId: listErpPurchaseOrders
-      summary: List company purchase orders
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated purchase orders }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/erp/invoices:
-    get:
-      tags: [ERP]
-      operationId: listErpInvoices
-      summary: List company invoices
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses: { "200": { description: Paginated invoices }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" } }
-  /api/v1/flows:
-    get:
-      tags: [Flows]
-      operationId: listFlows
-      summary: List company flows
-      description: Requires `flows:read`; results are restricted to the API-key company.
-      parameters:
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
-      responses:
-        "200": { description: Flow page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/flows/{id}:
-    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
-    get:
-      tags: [Flows]
-      operationId: getFlow
-      summary: Get a company flow
-      responses:
-        "200": { description: Flow, content: { application/json: { schema: { $ref: "#/components/schemas/Flow" } } } }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/flows/{id}/sessions:
-    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
-    get:
-      tags: [Flows]
-      operationId: listFlowSessions
-      summary: List sessions for a company flow
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses:
-        "200": { description: Session page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/flows/{id}/executions:
-    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
-    get:
-      tags: [Flows]
-      operationId: listFlowExecutions
-      summary: List executions for a company flow
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses:
-        "200": { description: Execution page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/flow-templates:
-    get:
-      tags: [Flows]
-      operationId: listFlowTemplates
-      summary: List active global flow templates
-      description: The source schema defines templates as a global catalog, not company-private data.
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
-      responses:
-        "200": { description: Template page, content: { application/json: { schema: { $ref: "#/components/schemas/PageResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/contacts:
     get:
       tags: [Contacts]
@@ -667,6 +556,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
     get:
       tags: [Deals]
       operationId: listDeals
@@ -743,6 +633,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
     delete:
       tags: [Deals]
       operationId: deleteDeal
@@ -755,6 +646,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/deals/{id}/move:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -776,6 +668,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/deals/{id}/stage:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1012,6 +905,38 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/conversations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    patch:
+      tags: [Conversations]
+      operationId: updateConversation
+      x-required-scopes: [conversations:write]
+      summary: Update conversation state
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                status: { type: string }
+                assigned_to_user_id: { type: [string, "null"], pattern: '^\d+$' }
+                bot_disabled: { type: boolean }
+                archived: { type: boolean }
+      responses:
+        "200": { description: Updated conversation }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/messages/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1820,7 +1745,7 @@ components:
         name: { type: string }
         status: { type: string }
         capabilities: { type: array, items: { type: string } }
-    Flow:
+    LegacyFlow:
       type: object
       required: [id, name, status, nodes, edges, version, created_at, updated_at]
       properties:
@@ -1833,7 +1758,7 @@ components:
         version: { type: integer }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-    FlowSession:
+    LegacyFlowSession:
       type: object
       required: [id, session_id, flow_id, conversation_id, contact_id, status, trigger_node_id, execution_path, session_data, started_at, last_activity_at, created_at, updated_at]
       properties:
@@ -1853,7 +1778,7 @@ components:
         expires_at: { type: [string, "null"] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-    FlowExecution:
+    LegacyFlowExecution:
       type: object
       required: [id, execution_id, flow_id, conversation_id, contact_id, status, trigger_node_id, execution_path, started_at, last_activity_at, created_at, updated_at]
       properties:
@@ -1874,7 +1799,7 @@ components:
         error_message: { type: [string, "null"] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-    FlowTemplate:
+    LegacyFlowTemplate:
       type: object
       required: [id, name, category, business_type, nodes, edges, tags, is_active, created_at, updated_at]
       properties:

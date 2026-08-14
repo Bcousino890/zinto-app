@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import { z } from "zod";
 
 import { defaultRateLimitConfig } from "./http/rate-limit.js";
@@ -14,6 +16,35 @@ function parseIdAllowlist(raw: string | undefined): number[] {
     return value;
   }))];
 }
+
+function isIpOrCidr(value: string): boolean {
+  const parts = value.split("/");
+  if (parts.length > 2 || parts[0] === undefined) return false;
+
+  const version = isIP(parts[0]);
+  if (version === 0) return false;
+  if (parts.length === 1) return true;
+
+  const prefix = parts[1];
+  if (prefix === undefined || !/^\d+$/.test(prefix)) return false;
+  return Number(prefix) <= (version === 4 ? 32 : 128);
+}
+
+const trustProxySchema = z.string().default("false").transform<false | string[]>((value, context) => {
+  const normalized = value.trim();
+  if (normalized === "false") return false;
+
+  const trustedProxies = normalized.split(",").map((proxy) => proxy.trim());
+  if (normalized === "true" || trustedProxies.some((proxy) => !isIpOrCidr(proxy))) {
+    context.addIssue({
+      code: "custom",
+      message: "TRUST_PROXY must be false or a comma-separated list of trusted proxy IPs/CIDRs"
+    });
+    return z.NEVER;
+  }
+
+  return trustedProxies;
+});
 
 const configSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -91,7 +122,7 @@ const configSchema = z.object({
   READ_ONLY_MODE: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
   WRITE_ENABLED_API_KEY_IDS: z.string().optional().transform(parseIdAllowlist),
   WRITE_ENABLED_COMPANY_IDS: z.string().optional().transform(parseIdAllowlist),
-  TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  TRUST_PROXY: trustProxySchema,
   WEBHOOK_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   WEBHOOK_WORKER_ENABLED: z.enum(["true", "false"]).default("false")
     .transform((value) => value === "true")

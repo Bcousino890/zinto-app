@@ -26,6 +26,10 @@ import type { PipelineCrudRepository } from "./resources/pipeline-crud.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
 import type { FlowRepository } from "./resources/flows.js";
 import type { ErpRepository } from "./resources/erp.js";
+import type { FlowReadRepository } from "./resources/flow-reads.js";
+import type { ErpReadRepository } from "./resources/erp-read.js";
+import type { DealMutationRepository } from "./resources/deal-mutations.js";
+import type { TaskMutationRepository } from "./resources/task-mutations.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerConversationMutationRoutes } from "./routes/conversation-mutations.js";
@@ -35,6 +39,10 @@ import { registerPipelineCrudRoutes } from "./routes/pipeline-crud.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
 import { registerFlowRoutes } from "./routes/flows.js";
 import { registerErpRoutes } from "./routes/erp.js";
+import { registerFlowReadRoutes } from "./routes/flow-reads.js";
+import { registerErpReadRoutes } from "./routes/erp-read.js";
+import { registerDealMutationRoutes } from "./routes/deal-mutations.js";
+import { registerTaskMutationRoutes } from "./routes/task-mutations.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
@@ -167,9 +175,13 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
     if (options.flowRepository !== undefined) {
       registerFlowRoutes(app, options.apiKeyRepository, options.flowRepository);
+    } else if (options.flowReadRepository !== undefined) {
+      registerFlowReadRoutes(app, options.apiKeyRepository, options.flowReadRepository);
     }
     if (options.erpRepository !== undefined) {
       registerErpRoutes(app, options.apiKeyRepository, options.erpRepository);
+    } else if (options.erpReadRepository !== undefined) {
+      registerErpReadRoutes(app, options.apiKeyRepository, options.erpReadRepository, rateLimiter);
     }
     if (options.pipelineMutationRepository !== undefined) {
       registerPipelineMutationRoutes(

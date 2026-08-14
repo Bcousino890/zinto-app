@@ -52,6 +52,7 @@ describe("preview deployment artifacts", () => {
   });
 
   it("documents that SmartBC write activation is separate from the read-only preview", async () => {
+    const nginx = await read("deploy/nginx-integration-api-preview.conf");
     const gettingStarted = await read("docs/GETTING-STARTED.md");
     const compatibility = await read("docs/SMARTBC-COMPATIBILITY.md");
     const checklist = await read("docs/SMARTBC-READINESS-CHECKLIST.md");
@@ -62,5 +63,7 @@ describe("preview deployment artifacts", () => {
     expect(checklist).toContain("READ_ONLY_MODE=true");
     expect(checklist).toContain("WEBHOOK_WORKER_ENABLED=false");
     expect(checklist).toContain("No hay migracion down automatica");
+    expect(nginx).toContain("proxy_set_header X-Forwarded-For $remote_addr;");
+    expect(nginx).not.toContain("$proxy_add_x_forwarded_for");
   });
 });
