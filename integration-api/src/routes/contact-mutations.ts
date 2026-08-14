@@ -27,6 +27,11 @@ const updateContactSchema = z.object({ ...contactFields, name: contactFields.nam
 const noteSchema = z.object({ content: z.string().trim().min(1).max(20_000) }).strict();
 const tagSchema = z.string().trim().min(1).max(100);
 
+function isDuplicateContactPhoneError(error: unknown): boolean {
+  const databaseError = error as { code?: unknown; constraint?: unknown };
+  return databaseError.code === "23505" && databaseError.constraint === "idx_contacts_unique_phone_company";
+}
+
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
   if (!result.success) throw new ApiError(400, "validation_error", "The request body is invalid");
@@ -65,11 +70,19 @@ export function registerContactMutationRoutes(
   app.post("/api/v1/contacts", { preHandler: protect(apiKeys, "contacts:write", rateLimiter, writeAccessPolicy) }, async (request, reply) => {
     const input = parse(createContactSchema, request.body);
     return withIdempotency(request, reply, idempotency, async () => {
-      const data = await repository.createContact(
-        request.apiPrincipal!.companyId,
-        request.apiPrincipal!.userId,
-        input
-      );
+      let data;
+      try {
+        data = await repository.createContact(
+          request.apiPrincipal!.companyId,
+          request.apiPrincipal!.userId,
+          input
+        );
+      } catch (error) {
+        if (isDuplicateContactPhoneError(error)) {
+          throw new ApiError(409, "contact_already_exists", "A contact with this phone already exists");
+        }
+        throw error;
+      }
       return { statusCode: 201, body: { data, meta: { request_id: request.id } } };
     });
   });

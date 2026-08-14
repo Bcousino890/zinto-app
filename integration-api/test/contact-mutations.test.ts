@@ -191,18 +191,34 @@ class MemoryContactMutationRepository implements ContactMutationRepository {
   }
 }
 
+class DuplicatePhoneContactRepository extends MemoryContactMutationRepository {
+  override async createContact(
+    _companyId: number,
+    _userId: number,
+    _input: ContactMutationInput
+  ): Promise<never> {
+    throw Object.assign(new Error("duplicate contact phone"), {
+      code: "23505",
+      constraint: "idx_contacts_unique_phone_company"
+    });
+  }
+}
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
 async function makeApp(options: {
   contactCreateDelayMs?: number;
+  duplicatePhone?: boolean;
   readOnly?: boolean;
   writeEnabledApiKeyIds?: number[];
   writeEnabledCompanyIds?: number[];
 } = {}) {
   const idempotency = new MemoryIdempotencyRepository();
-  const contacts = new MemoryContactMutationRepository(options.contactCreateDelayMs);
+  const contacts = options.duplicatePhone
+    ? new DuplicatePhoneContactRepository()
+    : new MemoryContactMutationRepository(options.contactCreateDelayMs);
   const app = await buildApp({
     apiKeyRepository: new MemoryApiKeyRepository(),
     contactMutationRepository: contacts,
@@ -217,6 +233,19 @@ async function makeApp(options: {
 }
 
 describe("contact mutations", () => {
+  it("returns a conflict when the phone already exists for the company", async () => {
+    const { app } = await makeApp({ duplicatePhone: true });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts",
+      headers: { ...authHeaders, "idempotency-key": "duplicate-phone-001" },
+      payload: { name: "SmartBC Piloto", phone: "+34606806103" }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("contact_already_exists");
+  });
+
   it("requires an idempotency key when creating a contact", async () => {
     const { app } = await makeApp();
     const response = await app.inject({
