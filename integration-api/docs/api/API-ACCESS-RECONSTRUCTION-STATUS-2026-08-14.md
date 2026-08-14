@@ -27,6 +27,11 @@ contract.
 7. Run backend build, frontend build, unit tests, tenant-isolation tests, and a
    staging smoke test before any production deployment.
 
+For a fresh recovered source tree, run
+`reconstructions/api-access/prepare-legacy-reintegration.sh /path/to/source`.
+It copies the kit without overwriting existing files and prints the remaining
+reviewable wiring steps.
+
 ## Current state
 
 - The reconstruction module is implemented and tested in the integration API
