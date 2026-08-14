@@ -210,4 +210,17 @@ describe("OpenAPI partner contract", () => {
     expect(delivery.requestBody.content["application/json"].schema.$ref)
       .toBe("#/components/schemas/WebhookEvent");
   });
+
+  it("documents the read-only safety response on every mutation", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const writeOperations = Object.entries(document.paths as Record<string, Record<string, unknown>>)
+      .flatMap(([path, methods]) => Object.keys(methods)
+        .filter((method) => ["post", "patch", "put", "delete"].includes(method))
+        .map((method) => `${method.toUpperCase()} ${path}`));
+
+    for (const operation of writeOperations) {
+      const [method, path] = operation.split(" ") as [string, string];
+      expect(document.paths[path][method.toLowerCase()].responses["503"], operation).toBeDefined();
+    }
+  });
 });

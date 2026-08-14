@@ -33,6 +33,13 @@ Durante la fase controlada en el VPS:
 https://crm.zinto.app/_integration-api
 ```
 
+El preview actual es solo lectura: Nginx solo admite `GET`, `HEAD` y `OPTIONS`,
+`READ_ONLY_MODE=true`, la migracion de Integration API no se aplica y el worker
+de webhooks permanece apagado. Por tanto, sirve para health, readiness y lecturas
+autenticadas; no permite crear contactos, registrar webhooks ni emitir eventos.
+No cambies esos limites para SmartBC hasta completar
+`docs/SMARTBC-READINESS-CHECKLIST.md`.
+
 Las rutas indicadas en OpenAPI se agregan a esa URL. Por ejemplo:
 
 ```text

@@ -142,6 +142,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/contacts/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -165,6 +166,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
     delete:
       tags: [Contacts]
       operationId: archiveContact
@@ -180,6 +182,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/contacts/{id}/notes:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -205,6 +208,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/notes/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -228,6 +232,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
     delete:
       tags: [Contacts]
       operationId: deleteContactNote
@@ -239,6 +244,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/contacts/{id}/tags/{tag}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -261,6 +267,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
     delete:
       tags: [Contacts]
       operationId: detachContactTag
@@ -276,6 +283,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/pipelines:
     get:
       tags: [Pipelines]
@@ -425,6 +433,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/StagePipelineMismatch" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/tasks:
     get:
       tags: [Tasks]
@@ -511,6 +520,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/conversations/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -590,6 +600,7 @@ paths:
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/messages/send-media:
     post:
       tags: [Messages]
@@ -646,6 +657,7 @@ paths:
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/messages/send-interactive:
     post:
       tags: [Messages]
@@ -669,6 +681,7 @@ paths:
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/flows:
     get:
       tags: [Flows]
@@ -905,6 +918,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
   /api/v1/webhooks/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -919,6 +933,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ReadOnlyMode" }
 webhooks:
   eventDelivery:
     post:
@@ -1039,7 +1054,7 @@ components:
       description: Tenant-scoped invoice
       content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceResponse" } } }
     ServiceUnavailable:
-      description: Operation temporarily disabled by a safety switch
+      description: Operation temporarily disabled by READ_ONLY_MODE or a resource safety switch
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -1090,6 +1105,11 @@ components:
         will not succeed unchanged, do not retry it as-is) from
         `delivery_failed` (the engine itself is unavailable or answered
         unexpectedly: safe to retry later with the same idempotency key).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ReadOnlyMode:
+      description: Write operations are temporarily disabled by READ_ONLY_MODE
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }

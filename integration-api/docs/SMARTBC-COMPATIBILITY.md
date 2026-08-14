@@ -121,11 +121,11 @@ la entrega es al menos una vez y no garantiza orden global.
 
 ## Eventos de `0.1.0`
 
-La migracion de eventos instala captura para todas las familias enumeradas en
-OpenAPI: CRM, deals, pipelines y etapas, tareas, ERP operativo y Flows. Los
-triggers de familias opcionales se crean solo cuando existe su tabla de origen.
-Los comodines usados en la documentacion son abreviaturas; SmartBC debe enviar
-uno de los valores completos de `WebhookEventType` al crear la suscripcion.
+Con la migracion aplicada y worker habilitado, la captura cubre todas las
+familias enumeradas en OpenAPI: CRM, deals, pipelines y etapas, tareas, ERP
+operativo y Flows. Los triggers de familias opcionales se crean solo cuando
+existe su tabla de origen. SmartBC debe enviar uno de los valores completos de
+`WebhookEventType` al crear la suscripcion.
 
 Un mensaje entrante y uno saliente usan `message.created`; SmartBC debe mirar
 `data.direction` (`incoming` u `outgoing`) en vez de esperar un evento separado
@@ -135,6 +135,10 @@ Un cambio de etapa emite `deal.stage.changed` en lugar de `deal.updated`, y la
 primera transicion de una tarea a completada emite `task.completed`. Que estas
 familias tengan eventos no implica que dispongan de endpoints CRUD publicos en
 `0.1.0`; SmartBC debe usar solo las rutas incluidas en OpenAPI.
+
+El preview controlado no aplica la migracion ni inicia el worker, por lo que no
+entrega eventos aunque acepte las rutas de lectura. Consulta
+`docs/SMARTBC-READINESS-CHECKLIST.md` antes de esperar webhooks en SmartBC.
 
 ## Compatibilidad hacia atras
 
