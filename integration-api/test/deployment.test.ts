@@ -59,7 +59,7 @@ describe("preview deployment artifacts", () => {
     const checklist = await read("docs/SMARTBC-READINESS-CHECKLIST.md");
 
     expect(gettingStarted).toContain("solo lectura");
-    expect(compatibility).toContain("migracion aplicada y worker habilitado");
+    expect(compatibility).toContain("La allowlist operativa es independiente");
     expect(checklist).toContain("company_id=3");
     expect(checklist).toContain("READ_ONLY_MODE=true");
     expect(checklist).toContain("WEBHOOK_WORKER_ENABLED=false");

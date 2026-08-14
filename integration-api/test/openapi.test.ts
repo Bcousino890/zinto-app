@@ -180,10 +180,25 @@ describe("OpenAPI partner contract", () => {
     const expectedScopes: Record<string, string[]> = {
       "GET /api/v1/pipelines": ["pipelines:read"],
       "GET /api/v1/pipelines/{id}/stages": ["pipelines:read"],
+      "POST /api/v1/pipelines": ["pipelines:write"],
+      "POST /api/v1/pipelines/{id}/stages": ["pipelines:write"],
+      "PATCH /api/v1/pipelines/{id}": ["pipelines:write"],
+      "DELETE /api/v1/pipelines/{id}": ["pipelines:write"],
+      "PATCH /api/v1/pipelines/{id}/stages/{stageId}": ["pipelines:write"],
+      "DELETE /api/v1/pipelines/{id}/stages/{stageId}": ["pipelines:write"],
       "GET /api/v1/deals": ["deals:read"],
       "GET /api/v1/deals/{id}": ["deals:read"],
+      "POST /api/v1/deals": ["deals:write"],
+      "PATCH /api/v1/deals/{id}": ["deals:write"],
+      "DELETE /api/v1/deals/{id}": ["deals:write"],
+      "POST /api/v1/deals/{id}/move": ["deals:write"],
       "PATCH /api/v1/deals/{id}/stage": ["deals:write"],
       "GET /api/v1/tasks": ["tasks:read"],
+      "POST /api/v1/tasks": ["tasks:write"],
+      "PATCH /api/v1/tasks/{id}": ["tasks:write"],
+      "DELETE /api/v1/tasks/{id}": ["tasks:write"],
+      "GET /api/v1/contacts/{id}": ["contacts:read"],
+      "GET /api/v1/contacts/{id}/notes": ["contacts:read", "notes:read"],
       "POST /api/v1/conversations": ["conversations:write"],
       "GET /api/v1/messages/{id}": ["messages:read"]
     };
@@ -200,6 +215,10 @@ describe("OpenAPI partner contract", () => {
     const eventType = document.components.schemas.WebhookEventType;
 
     expect([...eventType.enum].sort()).toEqual([...webhookEventTypes].sort());
+    expect(document.components.schemas.WebhookCreate.properties.event_types.maxItems)
+      .toBe(webhookEventTypes.length);
+    expect(document.components.schemas.WebhookCreate.properties.event_types)
+      .not.toHaveProperty("uniqueItems");
     expect(eventType.description).toContain("installed outbox migration");
     expect(document.components.schemas.WebhookEvent.properties.schema_version).toEqual({
       type: "integer",
@@ -238,5 +257,72 @@ describe("OpenAPI partner contract", () => {
       const [method, path] = operation.split(" ") as [string, string];
       expect(document.paths[path][method.toLowerCase()].responses["503"], operation).toBeDefined();
     }
+  });
+
+  it("publishes the canonical error components and applicable API errors", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    for (const name of ["BadRequest", "Unauthorized", "Forbidden", "NotFound", "Conflict",
+      "TooManyRequests", "InternalServerError", "PayloadTooLarge", "ServiceUnavailable"]) {
+      expect(document.components.responses[name], name).toBeDefined();
+    }
+
+    const messages = [
+      "/api/v1/messages/send",
+      "/api/v1/messages/send-media",
+      "/api/v1/messages/send-template",
+      "/api/v1/messages/send-interactive"
+    ];
+    for (const path of messages) {
+      const operation = document.paths[path].post;
+      expect(operation.responses["413"], path).toEqual({
+        $ref: "#/components/responses/PayloadTooLarge"
+      });
+      expect(operation.responses["429"], path).toEqual({
+        $ref: "#/components/responses/TooManyRequests"
+      });
+      expect(operation.responses["500"], path).toEqual({
+        $ref: "#/components/responses/InternalServerError"
+      });
+    }
+
+    for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, any>>)) {
+      if (!path.startsWith("/api/v1/")) continue;
+      for (const [method, operation] of Object.entries(methods)) {
+        if (!["get", "post", "patch", "put", "delete"].includes(method)) continue;
+        expect(operation.responses["429"], `${method.toUpperCase()} ${path}`).toEqual({
+          $ref: "#/components/responses/TooManyRequests"
+        });
+        expect(operation.responses["500"], `${method.toUpperCase()} ${path}`).toEqual({
+          $ref: "#/components/responses/InternalServerError"
+        });
+      }
+    }
+
+    expect(document.paths["/api/v1/webhooks"].post.responses["413"]).toEqual({
+      $ref: "#/components/responses/PayloadTooLarge"
+    });
+
+    const messageRead = document.paths["/api/v1/messages/{id}"].get;
+    expect(messageRead.responses["401"]).toEqual({ $ref: "#/components/responses/Unauthorized" });
+    expect(messageRead.responses["403"]).toEqual({ $ref: "#/components/responses/Forbidden" });
+    expect(messageRead.responses["429"]).toEqual({ $ref: "#/components/responses/TooManyRequests" });
+    expect(messageRead.responses["500"]).toEqual({ $ref: "#/components/responses/InternalServerError" });
+  });
+
+  it("matches the runtime contact mutation schemas", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const fields = document.components.schemas.ContactFields.properties;
+    expect(fields.name).toEqual(expect.objectContaining({ minLength: 1, maxLength: 255 }));
+    expect(fields.email).toEqual(expect.objectContaining({ maxLength: 320 }));
+    expect(fields.phone).toEqual(expect.objectContaining({ minLength: 3, maxLength: 50 }));
+    expect(fields.avatar_url).toEqual(expect.objectContaining({ maxLength: 2048 }));
+    expect(fields.company).toEqual(expect.objectContaining({ maxLength: 500 }));
+    expect(fields.tags).toEqual(expect.objectContaining({ maxItems: 100 }));
+    expect(fields.notes).toEqual(expect.objectContaining({ maxLength: 20000 }));
+    expect(document.components.schemas.ContactCreate.allOf[1].unevaluatedProperties).toBe(false);
+    expect(document.components.schemas.ContactUpdate.allOf[1]).toEqual(expect.objectContaining({
+      minProperties: 1,
+      unevaluatedProperties: false
+    }));
   });
 });

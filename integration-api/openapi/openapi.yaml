@@ -21,8 +21,6 @@ tags:
   - name: Flows
   - name: ERP
   - name: Webhooks
-  - name: Flows
-  - name: ERP
 security:
   - bearerAuth: []
 paths:
@@ -75,6 +73,8 @@ paths:
                 $ref: "#/components/schemas/IdentityResponse"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/channels:
     get:
       tags: [Channels]
@@ -96,6 +96,8 @@ paths:
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/contacts:
     get:
       tags: [Contacts]
@@ -122,6 +124,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Contacts]
       operationId: createContact
@@ -145,6 +149,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/contacts/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -152,6 +158,7 @@ paths:
       tags: [Contacts]
       operationId: getContact
       summary: Fetch one contact owned by the company
+      x-required-scopes: [contacts:read]
       responses:
         "200":
           description: Contact
@@ -162,6 +169,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     patch:
       tags: [Contacts]
       operationId: updateContact
@@ -183,6 +192,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Contacts]
       operationId: archiveContact
@@ -199,6 +210,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/contacts/{id}/notes:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -206,6 +219,7 @@ paths:
       tags: [Contacts]
       operationId: listContactNotes
       summary: List notes for a contact with cursor pagination
+      x-required-scopes: [contacts:read, notes:read]
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
@@ -227,6 +241,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Contacts]
       operationId: createContactNote
@@ -250,6 +266,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/notes/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -274,6 +292,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Contacts]
       operationId: deleteContactNote
@@ -286,6 +306,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/contacts/{id}/tags/{tag}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -309,6 +331,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Contacts]
       operationId: detachContactTag
@@ -325,12 +349,15 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/pipelines:
     post:
       tags: [Pipelines]
       operationId: createPipeline
       summary: Create a pipeline
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -357,6 +384,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     get:
       tags: [Pipelines]
       operationId: listPipelines
@@ -382,6 +411,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/pipelines/{id}/stages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -411,11 +442,14 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Pipelines]
       operationId: createPipelineStage
       summary: Create a pipeline stage
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/ResourceId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -438,6 +472,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/pipelines/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -446,6 +482,7 @@ paths:
       operationId: updatePipeline
       summary: Update a pipeline
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -473,11 +510,14 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Pipelines]
       operationId: deletePipeline
       summary: Delete an unused pipeline
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       responses:
@@ -488,6 +528,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/pipelines/{id}/stages/{stageId}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -500,6 +542,7 @@ paths:
       operationId: updatePipelineStage
       summary: Update a pipeline stage
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -522,11 +565,14 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Pipelines]
       operationId: deletePipelineStage
       summary: Delete an unused pipeline stage
       description: Requires `pipelines:write` and an `Idempotency-Key`.
+      x-required-scopes: [pipelines:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       responses:
@@ -537,11 +583,14 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/deals:
     post:
       tags: [Deals]
       operationId: createDeal
       summary: Create a deal for a company contact
+      x-required-scopes: [deals:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -557,6 +606,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     get:
       tags: [Deals]
       operationId: listDeals
@@ -592,6 +643,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/deals/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -615,10 +668,13 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     patch:
       tags: [Deals]
       operationId: updateDeal
       summary: Update a deal owned by the company
+      x-required-scopes: [deals:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -634,10 +690,13 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Deals]
       operationId: deleteDeal
       summary: Delete a deal owned by the company
+      x-required-scopes: [deals:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       responses:
@@ -647,6 +706,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/deals/{id}/move:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -654,6 +715,7 @@ paths:
       tags: [Deals]
       operationId: moveDeal
       summary: Move a deal to a stage in another pipeline
+      x-required-scopes: [deals:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -669,6 +731,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/deals/{id}/stage:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -705,6 +769,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/StagePipelineMismatch" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/tasks:
     get:
       tags: [Tasks]
@@ -734,11 +800,14 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Tasks]
       operationId: createTask
       summary: Create a task for a company contact
       description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
+      x-required-scopes: [tasks:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -764,12 +833,15 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/tasks/{id}:
     patch:
       tags: [Tasks]
       operationId: updateTask
       summary: Update a task
       description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
+      x-required-scopes: [tasks:write]
       parameters:
         - $ref: "#/components/parameters/ResourceId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -796,11 +868,14 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [Tasks]
       operationId: deleteTask
       summary: Delete a task
       description: Requires the `tasks:write` API-key scope and an `Idempotency-Key`.
+      x-required-scopes: [tasks:write]
       parameters:
         - $ref: "#/components/parameters/ResourceId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -812,6 +887,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/conversations:
     get:
       tags: [Conversations]
@@ -838,6 +915,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Conversations]
       operationId: createConversation
@@ -870,6 +949,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/conversations/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -905,6 +986,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/conversations/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -937,6 +1020,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/messages/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -957,7 +1042,11 @@ paths:
                   data: { $ref: "#/components/schemas/Message" }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/messages/send:
     post:
       tags: [Messages]
@@ -973,6 +1062,7 @@ paths:
             schema: { $ref: "#/components/schemas/TextMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -982,6 +1072,8 @@ paths:
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/messages/send-media:
     post:
       tags: [Messages]
@@ -1006,6 +1098,7 @@ paths:
             schema: { $ref: "#/components/schemas/MediaMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1015,6 +1108,8 @@ paths:
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/messages/send-template:
     post:
       tags: [Messages]
@@ -1030,6 +1125,7 @@ paths:
             schema: { $ref: "#/components/schemas/TemplateMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1039,6 +1135,8 @@ paths:
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/messages/send-interactive:
     post:
       tags: [Messages]
@@ -1054,6 +1152,7 @@ paths:
             schema: { $ref: "#/components/schemas/InteractiveMessageInput" }
       responses:
         "201": { $ref: "#/components/responses/MessageAccepted" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1063,6 +1162,8 @@ paths:
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/flows:
     get:
       tags: [Flows]
@@ -1079,6 +1180,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/flows/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1093,6 +1196,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/flows/{id}/assignments:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1111,6 +1216,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/flow-executions:
     get:
       tags: [Flows]
@@ -1132,6 +1239,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/products:
     get:
       tags: [ERP]
@@ -1150,6 +1259,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/products/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1164,6 +1275,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/stock-levels:
     get:
       tags: [ERP]
@@ -1184,6 +1297,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/sales-orders:
     get:
       tags: [ERP]
@@ -1202,6 +1317,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/sales-orders/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1216,6 +1333,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/invoices:
     get:
       tags: [ERP]
@@ -1237,6 +1356,8 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/erp/invoices/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1251,6 +1372,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/webhooks:
     get:
       tags: [Webhooks]
@@ -1271,6 +1394,8 @@ paths:
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [Webhooks]
       operationId: createWebhook
@@ -1297,9 +1422,12 @@ paths:
                           secret: { type: string, pattern: '^whsec_[a-f0-9]{64}$' }
                   meta: { $ref: "#/components/schemas/RequestMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /api/v1/webhooks/{id}:
     parameters:
       - $ref: "#/components/parameters/ResourceId"
@@ -1315,6 +1443,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ReadOnlyMode" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 webhooks:
   eventDelivery:
     post:
@@ -1439,6 +1569,25 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
+    TooManyRequests:
+      description: The API-key, company, or source IP exceeded its fixed-window rate limit
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    InternalServerError:
+      description: Unexpected server-side failure
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    PayloadTooLarge:
+      description: Request body exceeds the route's configured size limit
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     BadRequest:
       description: Validation or safety check failed
       content:
@@ -1460,7 +1609,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     Conflict:
-      description: Idempotency conflict or inactive channel
+      description: Duplicate resource, idempotency conflict, or inactive channel
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -1818,26 +1967,28 @@ components:
       type: object
       properties:
         name: { type: string, minLength: 1, maxLength: 255 }
-        email: { type: [string, "null"], format: email }
-        phone: { type: [string, "null"] }
-        avatar_url: { type: [string, "null"], format: uri }
-        company: { type: [string, "null"] }
-        tags: { type: array, items: { type: string } }
-        source: { type: [string, "null"] }
-        notes: { type: [string, "null"] }
+        email: { type: [string, "null"], format: email, maxLength: 320 }
+        phone: { type: [string, "null"], minLength: 3, maxLength: 50 }
+        avatar_url: { type: [string, "null"], format: uri, maxLength: 2048 }
+        company: { type: [string, "null"], maxLength: 500 }
+        tags:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 100 }
+        source: { type: [string, "null"], maxLength: 500 }
+        notes: { type: [string, "null"], maxLength: 20000 }
         custom_fields: { type: object, additionalProperties: true }
     ContactCreate:
       allOf:
         - $ref: "#/components/schemas/ContactFields"
         - type: object
-          required: [name]
-          additionalProperties: false
+          unevaluatedProperties: false
     ContactUpdate:
       allOf:
         - $ref: "#/components/schemas/ContactFields"
         - type: object
           minProperties: 1
-          additionalProperties: false
+          unevaluatedProperties: false
     Contact:
       allOf:
         - $ref: "#/components/schemas/ContactFields"
@@ -2137,7 +2288,7 @@ components:
         event_types:
           type: array
           minItems: 1
-          maxItems: 20
+          maxItems: 61
           items: { $ref: "#/components/schemas/WebhookEventType" }
     WebhookEndpoint:
       type: object
