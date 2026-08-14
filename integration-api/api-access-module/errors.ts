@@ -1,4 +1,7 @@
 export type PermissionValidationCode =
+  | "invalid_body"
+  | "invalid_name"
+  | "invalid_profile"
   | "invalid_permissions"
   | "unknown_permission"
   | "unknown_profile"
@@ -16,4 +19,3 @@ export class PermissionValidationError extends Error {
     this.details = details;
   }
 }
-

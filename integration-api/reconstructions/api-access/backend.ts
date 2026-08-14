@@ -60,7 +60,7 @@ function normalizeName(name: string): string {
 export async function createApiKey(
   store: ApiKeyStore,
   input: CreateApiKeyInput,
-  random = randomBytes
+  random: (size: number) => Buffer = (size) => randomBytes(size)
 ): Promise<{ record: ApiKeyRecord; secret: string }> {
   validateOwner(input.companyId, "companyId");
   validateOwner(input.userId, "userId");
