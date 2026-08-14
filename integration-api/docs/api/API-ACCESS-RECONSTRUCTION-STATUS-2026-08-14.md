@@ -14,7 +14,7 @@ contract.
 
 ## Re-entry procedure after a CRM rebuild
 
-1. Copy `legacy-sequelize-model.ts` into `backend/src/models/ApiKey.ts`.
+1. Copy `ApiKey.ts.template` into `backend/src/models/ApiKey.ts`.
 2. Add `ApiKey` to the Sequelize model list in `backend/src/database/index.ts`.
 3. Apply `legacy-migration.sql` only after checking the live schema and taking a
    restorable backup.
