@@ -1,0 +1,7 @@
+diff --git a/backend/src/routes/index.ts b/backend/src/routes/index.ts
+--- a/backend/src/routes/index.ts
++++ b/backend/src/routes/index.ts
+@@ -5,0 +6 @@
++import apiKeyRoutes from "./apiKeyRoutes";
+@@ -56,0 +58 @@
++routes.use(apiKeyRoutes);

@@ -33,7 +33,8 @@ Prepared the non-destructive reintegration kit.
 
 Next source changes are intentionally manual and reviewable:
 1. Add ApiKey to sequelize.addModels(models) in backend/src/database/index.ts.
-2. Import apiKeyRoutes from ./apiKeyRoutes and mount it in backend/src/routes/index.ts.
+2. Apply reconstructions/api-access/legacy-routes-index.patch to import and mount
+   apiKeyRoutes in backend/src/routes/index.ts.
 3. Apply legacy-migration.sql only against a backed-up staging database.
 4. Build backend and frontend, then run the API Access smoke tests.
 EOF

@@ -33,6 +33,10 @@ For a fresh recovered source tree, run
 It copies the kit without overwriting existing files and prints the remaining
 reviewable wiring steps.
 
+The route registration is captured in
+`reconstructions/api-access/legacy-routes-index.patch` so it can be reviewed,
+applied, or reverted as one small change.
+
 ## Current state
 
 - The reconstruction module is implemented and tested in the integration API
