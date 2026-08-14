@@ -20,27 +20,25 @@ La version `0.1.0` cubre:
 - productos, existencias, pedidos de venta y facturas ERP en solo lectura;
 - webhooks firmados para sincronizacion de cambios.
 
-Las escrituras de Flows y ERP no forman parte de `0.1.0`. El contrato listo, las
-exclusiones y el checklist de desbloqueo estan en
-`docs/FLOWS-ERP-SCOPE-CLOSURE.md`. Pipelines, oportunidades, tareas, ERP y
-Flows tambien estan incluidos en el modelo de eventos instalado. Las rutas de
-lectura publicadas en OpenAPI son la unica superficie disponible; no existen
-endpoints de escritura para Flows ni ERP en esta version.
+Las escrituras de Flows y ERP no forman parte de `0.1.0`. Pipelines, deals,
+tareas, ERP y Flows tambien pueden aparecer en el modelo de eventos instalado,
+pero SmartBC debe usar unicamente las rutas publicadas en la matriz de
+compatibilidad. No existen endpoints de escritura para Flows ni ERP en esta
+version.
 
 ## URL base
 
-Durante la fase controlada en el VPS:
+URL de produccion:
 
 ```text
 https://crm.zinto.app/_integration-api
 ```
 
-El preview actual es solo lectura: Nginx solo admite `GET`, `HEAD` y `OPTIONS`,
-`READ_ONLY_MODE=true`, la migracion de Integration API no se aplica y el worker
-de webhooks permanece apagado. Por tanto, sirve para health, readiness y lecturas
-autenticadas; no permite crear contactos, registrar webhooks ni emitir eventos.
-No cambies esos limites para SmartBC hasta completar
-`docs/SMARTBC-READINESS-CHECKLIST.md`.
+La disponibilidad de escrituras y del worker de webhooks es una configuracion
+operativa separada del contrato. Una clave puede tener un scope de escritura y
+seguir recibiendo `403` si la empresa o la clave no esta en la allowlist.
+Comprueba siempre `/api/v1/me` y la autorizacion operativa del piloto antes de
+probar mutaciones.
 
 Las rutas indicadas en OpenAPI se agregan a esa URL. Por ejemplo:
 
@@ -84,10 +82,11 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
 1. Verifica la clave con `GET /api/v1/me`.
 2. Descubre los canales con `GET /api/v1/channels`.
 3. Importa contactos y conversaciones siguiendo `next_cursor`.
-4. Registra un webhook HTTPS y guarda el secreto devuelto una sola vez.
-5. Usa `Idempotency-Key` en cada creacion y cada envio.
-6. Procesa webhooks de forma idempotente usando `X-Zinto-Event-Id`.
-7. Reconcilia periodicamente mediante los endpoints de lectura.
+4. Crea o reutiliza conversaciones con `contact_id` y `channel_id`.
+5. Registra un webhook HTTPS y guarda el secreto devuelto una sola vez.
+6. Usa `Idempotency-Key` en cada creacion y cada envio que lo exija.
+7. Procesa webhooks de forma idempotente usando `event.id`.
+8. Reconcilia periodicamente mediante los endpoints de lectura.
 
 ## Contrato y ejemplos
 

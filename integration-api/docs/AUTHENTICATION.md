@@ -32,11 +32,13 @@ mediante parametros del cliente.
 | `notes:write` | Crear, editar y borrar notas |
 | `tags:write` | Asociar y quitar etiquetas |
 | `pipelines:read` | Leer pipelines y sus etapas |
+| `pipelines:write` | Crear, editar y borrar pipelines y etapas |
 | `deals:read` | Leer oportunidades |
-| `deals:write` | Cambiar la etapa de una oportunidad |
+| `deals:write` | Crear, editar, borrar y mover oportunidades |
 | `tasks:read` | Leer tareas de contactos |
+| `tasks:write` | Crear, editar y borrar tareas |
 | `conversations:write` | Crear o reencontrar conversaciones uno-a-uno |
-| `flows:read` | Leer metadatos, asignaciones y ejecuciones seguras de Flows |
+| `flows:read` | Leer Flows, asignaciones y ejecuciones agregadas |
 | `erp.products:read` | Leer productos ERP seguros |
 | `erp.inventory:read` | Leer niveles de existencias ERP |
 | `erp.sales-orders:read` | Leer cabeceras de pedidos de venta ERP |

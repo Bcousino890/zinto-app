@@ -1,28 +1,29 @@
-# Integración SmartBC con Zinto
+# Integracion SmartBC con Zinto
 
-## 1. Propósito
+## 1. Proposito y estado del contrato
 
-Este documento es la guía operativa para conectar SmartBC con Zinto de forma bidireccional. La integración debe permitir que SmartBC consulte y actualice, según los permisos concedidos, los contactos, conversaciones, mensajes, notas, etiquetas, tareas, pipelines, deals y canales de Zinto. Los cambios originados en Zinto se notifican a SmartBC mediante webhooks firmados.
+Esta guia describe el contrato que SmartBC puede consumir para sincronizar
+contactos, conversaciones, mensajes, notas, etiquetas, pipelines, deals,
+tareas, Flows y una proyeccion ERP de Zinto. La empresa se determina
+exclusivamente por la API key: SmartBC no debe enviar `company_id`.
 
-La empresa y el alcance de los datos se determinan exclusivamente por la API key. SmartBC no debe enviar `company_id` ni confiar en un identificador de empresa recibido desde el navegador.
+El runtime actual publica CRM de lectura y escritura controlada. Flows y ERP
+son solo de lectura. Los scopes no abren por si solos las escrituras: Zinto
+puede exigir que la empresa o la API key este en una allowlist operativa.
+Una peticion de escritura fuera de esa allowlist recibe `403` aunque el scope
+este concedido.
 
-**Estado actual:** el contrato principal de CRM tiene lecturas y escrituras controladas; Flows y ERP están publicados en este bloque como lectura. Las escrituras globales pueden permanecer cerradas aunque una API key tenga scopes de escritura. La apertura para SmartBC debe hacerse con una allowlist de empresa o de clave, nunca retirando la protección global para todos los partners.
-
-## 2. URLs y autenticación
-
-Base URL del contrato:
+## 2. URL y autenticacion
 
 ```text
 https://crm.zinto.app/_integration-api
 ```
 
-Todas las rutas protegidas usan:
+Las rutas protegidas usan:
 
 ```http
 Authorization: Bearer pcp_<64 caracteres hexadecimales>
 ```
-
-Ejemplo de comprobación:
 
 ```bash
 export ZINTO_API_URL="https://crm.zinto.app/_integration-api"
@@ -32,20 +33,22 @@ curl --fail-with-body "$ZINTO_API_URL/api/v1/me" \
   -H "Authorization: Bearer $ZINTO_API_KEY"
 ```
 
-La respuesta de `/api/v1/me` confirma la empresa, el nombre técnico de la clave y los scopes efectivos. La clave debe guardarse únicamente en el backend de SmartBC, nunca en JavaScript del navegador, URLs, logs, repositorios o tickets.
+La respuesta de `/api/v1/me` confirma la empresa, la clave y sus scopes
+efectivos. Guarda la clave solo en el backend de SmartBC: nunca en el
+navegador, URLs, logs, repositorios, tickets o capturas.
 
-## 3. Scopes
+## 3. Scopes exactos
 
-| Scope | Capacidades |
+| Scope | Capacidades del runtime |
 |---|---|
-| `channels:read` | Canales y capacidades disponibles |
-| `contacts:read` | Listar, consultar y sincronizar contactos |
+| `channels:read` | Leer canales y sus capacidades |
+| `contacts:read` | Listar y consultar contactos |
 | `contacts:write` | Crear, actualizar y archivar contactos |
 | `conversations:read` | Listar conversaciones |
-| `conversations:write` | Crear o actualizar conversaciones |
-| `messages:read` | Consultar mensajes e historial completo |
+| `conversations:write` | Crear/reutilizar y actualizar conversaciones |
+| `messages:read` | Leer mensajes por conversacion o por ID |
 | `messages:send` | Enviar texto, media, plantillas e interactivos compatibles |
-| `notes:read` | Leer notas de contactos |
+| `notes:read` | Leer notas de un contacto; se usa junto con `contacts:read` |
 | `notes:write` | Crear, editar y borrar notas |
 | `tags:write` | Asociar y quitar etiquetas |
 | `pipelines:read` | Leer pipelines y etapas |
@@ -55,32 +58,35 @@ La respuesta de `/api/v1/me` confirma la empresa, el nombre técnico de la clave
 | `tasks:read` | Leer tareas |
 | `tasks:write` | Crear, editar y borrar tareas |
 | `webhooks:manage` | Registrar, listar y desactivar webhooks |
-| `flows:read` | Leer flows, sesiones, ejecuciones y plantillas |
-| `erp:read` | Leer recursos ERP publicados |
-| `inventory:read` | Leer almacenes y stock; se exige junto con `erp:read` |
-| `*` | Acceso total; reservar para administración controlada |
+| `flows:read` | Leer flows, asignaciones y ejecuciones agregadas |
+| `erp.products:read` | Leer productos ERP |
+| `erp.inventory:read` | Leer niveles de stock ERP |
+| `erp.sales-orders:read` | Leer pedidos de venta ERP |
+| `erp.invoices:read` | Leer invoices ERP |
+| `*` | Acceso total; reservar para administracion controlada |
 
-Los scopes no abren por sí mismos las escrituras. La política operativa puede devolver `403` aunque la clave tenga el scope correcto. El operador debe autorizar explícitamente la empresa piloto y la clave antes de una prueba de escritura.
+`media:upload` no es un scope de este contrato publico y no debe usarse para
+inferir que existe una subida de archivos en `/_integration-api`.
 
-## 4. Matriz de endpoints
+## 4. Matriz exacta de endpoints
 
 ### Identidad y canales
 
-| Método | Ruta | Scope |
+| Metodo | Ruta | Scope |
 |---|---|---|
-| `GET` | `/api/v1/me` | autenticación |
+| `GET` | `/api/v1/me` | Clave valida |
 | `GET` | `/api/v1/channels` | `channels:read` |
 
 ### Contactos, notas y etiquetas
 
-| Método | Ruta | Scope |
+| Metodo | Ruta | Scope |
 |---|---|---|
 | `GET` | `/api/v1/contacts` | `contacts:read` |
-| `POST` | `/api/v1/contacts` | `contacts:write` |
 | `GET` | `/api/v1/contacts/{id}` | `contacts:read` |
+| `POST` | `/api/v1/contacts` | `contacts:write` |
 | `PATCH` | `/api/v1/contacts/{id}` | `contacts:write` |
 | `DELETE` | `/api/v1/contacts/{id}` | `contacts:write` |
-| `GET` | `/api/v1/contacts/{id}/notes` | `notes:read` |
+| `GET` | `/api/v1/contacts/{id}/notes` | `contacts:read` y `notes:read` |
 | `POST` | `/api/v1/contacts/{id}/notes` | `notes:write` |
 | `PATCH` | `/api/v1/notes/{id}` | `notes:write` |
 | `DELETE` | `/api/v1/notes/{id}` | `notes:write` |
@@ -89,23 +95,25 @@ Los scopes no abren por sí mismos las escrituras. La política operativa puede 
 
 ### Conversaciones y mensajes
 
-| Método | Ruta | Scope |
+| Metodo | Ruta | Scope |
 |---|---|---|
 | `GET` | `/api/v1/conversations` | `conversations:read` |
 | `POST` | `/api/v1/conversations` | `conversations:write` |
 | `PATCH` | `/api/v1/conversations/{id}` | `conversations:write` |
-| `GET` | `/api/v1/conversations/{id}/messages` | `messages:read` |
+| `GET` | `/api/v1/conversations/{id}/messages` | `conversations:read` y `messages:read` |
 | `GET` | `/api/v1/messages/{id}` | `messages:read` |
 | `POST` | `/api/v1/messages/send` | `messages:send` |
 | `POST` | `/api/v1/messages/send-media` | `messages:send` |
 | `POST` | `/api/v1/messages/send-template` | `messages:send` |
 | `POST` | `/api/v1/messages/send-interactive` | `messages:send` |
 
-El historial de mensajes se consulta por conversación y no se limita al día actual. SmartBC debe persistir el `id` de conversación de Zinto y recorrer todas las páginas con cursor.
+`POST /api/v1/conversations` busca una conversacion por `contact_id` y
+`channel_id` dentro de la empresa de la clave. Devuelve `201` si la crea y
+`200` si reutiliza una existente. No crea duplicados deliberadamente.
 
 ### Pipelines, deals y tareas
 
-| Método | Ruta | Scope |
+| Metodo | Ruta | Scope |
 |---|---|---|
 | `GET` | `/api/v1/pipelines` | `pipelines:read` |
 | `GET` | `/api/v1/pipelines/{id}/stages` | `pipelines:read` |
@@ -127,35 +135,42 @@ El historial de mensajes se consulta por conversación y no se limita al día ac
 | `PATCH` | `/api/v1/tasks/{id}` | `tasks:write` |
 | `DELETE` | `/api/v1/tasks/{id}` | `tasks:write` |
 
-Para cambiar un deal se debe usar `/move` con `pipeline_id` y `stage_id` reales. No se debe escribir directamente el campo histórico `stage` ni inventar nombres de etapas.
+Para mover un deal usa IDs numericos reales. `/move` recibe `pipeline_id` y
+`stage_id`; `/stage` recibe solo `stage_id`. No escribas el campo historico
+`stage` con un nombre inventado.
 
-### Flows
+### Flows: solo lectura
 
-| Método | Ruta | Scope | Estado |
-|---|---|---|---|
-| `GET` | `/api/v1/flows` | `flows:read` | lectura |
-| `GET` | `/api/v1/flows/{id}` | `flows:read` | lectura |
-| `GET` | `/api/v1/flows/{id}/sessions` | `flows:read` | lectura |
-| `GET` | `/api/v1/flows/{id}/executions` | `flows:read` | lectura |
-| `GET` | `/api/v1/flow-templates` | `flows:read` | lectura |
-
-No hay todavía endpoints de creación, edición, activación o ejecución de flows.
-
-### ERP
-
-| Método | Ruta | Scopes |
+| Metodo | Ruta | Scope |
 |---|---|---|
-| `GET` | `/api/v1/erp/products` | `erp:read` |
-| `GET` | `/api/v1/erp/inventory/warehouses` | `erp:read`, `inventory:read` |
-| `GET` | `/api/v1/erp/inventory/stock-levels` | `erp:read`, `inventory:read` |
-| `GET` | `/api/v1/erp/suppliers` | `erp:read` |
-| `GET` | `/api/v1/erp/sales-orders` | `erp:read` |
-| `GET` | `/api/v1/erp/purchase-orders` | `erp:read` |
-| `GET` | `/api/v1/erp/invoices` | `erp:read` |
+| `GET` | `/api/v1/flows` | `flows:read` |
+| `GET` | `/api/v1/flows/{id}` | `flows:read` |
+| `GET` | `/api/v1/flows/{id}/assignments` | `flows:read` |
+| `GET` | `/api/v1/flow-executions` | `flows:read` |
 
-El bloque ERP actual es de lectura. No incluye variantes, líneas detalladas, movimientos o transferencias de stock, pagos, contabilidad ni escrituras.
+`/api/v1/flow-executions` acepta opcionalmente `flow_id`, `status`,
+`updated_since`, `cursor` y `limit`. No hay rutas publicas para crear, editar,
+activar, ejecutar, pausar o borrar Flows. Las rutas alternativas
+`/flows/{id}/sessions`, `/flows/{id}/executions` y `/flow-templates` no forman
+parte del runtime publicado actual.
 
-## 5. Patrón de respuesta y paginación
+### ERP: solo lectura
+
+| Metodo | Ruta | Scope |
+|---|---|---|
+| `GET` | `/api/v1/erp/products` | `erp.products:read` |
+| `GET` | `/api/v1/erp/products/{id}` | `erp.products:read` |
+| `GET` | `/api/v1/erp/stock-levels` | `erp.inventory:read` |
+| `GET` | `/api/v1/erp/sales-orders` | `erp.sales-orders:read` |
+| `GET` | `/api/v1/erp/sales-orders/{id}` | `erp.sales-orders:read` |
+| `GET` | `/api/v1/erp/invoices` | `erp.invoices:read` |
+| `GET` | `/api/v1/erp/invoices/{id}` | `erp.invoices:read` |
+
+No publiques de esta version las rutas de warehouses, suppliers,
+purchase-orders, movimientos o transferencias de stock. Tampoco hay escrituras
+ERP, variantes, lineas detalladas, pagos ni contabilidad en este contrato.
+
+## 5. Respuestas y paginacion
 
 Las listas devuelven:
 
@@ -170,20 +185,15 @@ Las listas devuelven:
 }
 ```
 
-Usar `limit` entre 1 y 200. Si `has_more` es `true`, repetir la misma ruta con `cursor` igual a `next_cursor`, sin interpretar ni modificar el cursor.
+`limit` acepta de 1 a 200 y por defecto es 50. El cursor es opaco: reenvia
+`meta.next_cursor` sin modificarlo. Las rutas que aceptan `updated_since`
+documentan ese parametro explicitamente; usa un solapamiento temporal y
+deduplica por ID.
 
-Para sincronización incremental, usar `updated_since` solo en los endpoints que lo documenten. Guardar el último instante procesado y añadir un pequeño solapamiento temporal; deduplicar por el ID de Zinto para no perder actualizaciones ocurridas en el límite.
+## 6. Flujo minimo correcto: contacto, conversacion y mensaje
 
-Algoritmo recomendado:
-
-1. Leer la primera página.
-2. Persistir cada recurso por su ID de Zinto usando upsert.
-3. Guardar `next_cursor` junto con el checkpoint.
-4. Continuar hasta `has_more=false`.
-5. Confirmar el checkpoint solo después de persistir la página completa.
-6. En una repetición, aceptar duplicados y resolverlos por ID y `updated_at`.
-
-## 6. Crear un contacto y enviar un mensaje
+Crear un contacto. Si el telefono ya existe en la misma empresa, la respuesta
+es `409 contact_already_exists`; en ese caso busca y reutiliza el contacto.
 
 ```bash
 curl --fail-with-body --request POST \
@@ -193,11 +203,37 @@ curl --fail-with-body --request POST \
   -H "Idempotency-Key: smartbc-contact-7e4b" \
   -d '{
     "name": "Cliente de prueba",
-    "phone": "+34606806103"
+    "phone": "+34600000000"
   }'
 ```
 
-Después de resolver o crear la conversación, enviar texto:
+Crear o localizar una conversacion con el contacto y canal reales:
+
+```bash
+curl --fail-with-body --request POST \
+  "$ZINTO_API_URL/api/v1/conversations" \
+  -H "Authorization: Bearer $ZINTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contact_id": "123",
+    "channel_id": "456"
+  }'
+```
+
+Leer el historial completo y un mensaje individual:
+
+```bash
+curl --fail-with-body \
+  "$ZINTO_API_URL/api/v1/conversations/789/messages?limit=50" \
+  -H "Authorization: Bearer $ZINTO_API_KEY"
+
+curl --fail-with-body \
+  "$ZINTO_API_URL/api/v1/messages/701" \
+  -H "Authorization: Bearer $ZINTO_API_KEY"
+```
+
+Enviar texto. El runtime exige `channel_id`, `to` y `message`; no acepta el
+formato antiguo `conversation_id` + `body` en esta ruta.
 
 ```bash
 curl --fail-with-body --request POST \
@@ -206,79 +242,88 @@ curl --fail-with-body --request POST \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: smartbc-message-9c2a" \
   -d '{
-    "conversation_id": "123",
-    "body": "Mensaje enviado desde SmartBC"
+    "channel_id": "456",
+    "to": "+34600000000",
+    "message": "Mensaje enviado desde SmartBC"
   }'
 ```
 
-El esquema exacto de cada cuerpo está en `openapi/openapi.yaml`; SmartBC debe generar sus tipos desde ese contrato y no inferir campos desde la interfaz web.
+Formato `send-media`:
 
-## 7. Idempotencia y reintentos
-
-Usar un `Idempotency-Key` nuevo por operación lógica en cada POST, PATCH y DELETE que lo exija el contrato. Si una petición falla por red, repetir exactamente método, ruta, cuerpo y clave. Reutilizar la clave con otro cuerpo produce `409 idempotency_conflict`.
-
-Un `504 delivery_timeout` significa que el proveedor pudo haber aceptado el mensaje. No crear otra clave inmediatamente: consultar el estado o esperar el webhook. Un `502 delivery_rejected` normalmente requiere corregir la petición; un `502 delivery_failed` puede reintentarse con la misma clave después de una espera.
-
-## 8. Webhooks bidireccionales
-
-Registrar un endpoint HTTPS con `POST /api/v1/webhooks` y el scope `webhooks:manage`. El secreto `whsec_...` se devuelve una sola vez.
-
-Eventos disponibles actualmente:
-
-```text
-contact.created
-contact.updated
-contact.deleted
-conversation.created
-conversation.updated
-message.created
-message.status.updated
-note.created
-note.updated
-note.deleted
-tag.attached
-tag.detached
-deal.created
-deal.updated
-deal.stage.changed
-deal.deleted
-task.created
-task.updated
-task.completed
-task.deleted
-channel.connection.updated
-```
-
-Cabeceras:
-
-```text
-X-Zinto-Event-Id
-X-Zinto-Timestamp
-X-Zinto-Signature: v1=<hex>
-```
-
-La firma es HMAC-SHA256 del texto exacto `<timestamp>.<raw_body>` con el secreto del endpoint. Verificarla antes de parsear el JSON, rechazar timestamps fuera de una tolerancia de cinco minutos y deduplicar por `event.id`.
-
-El receptor de SmartBC debe guardar el evento y responder `2xx` rápidamente; el procesamiento pesado debe hacerse después. Zinto puede entregar el mismo evento más de una vez, no garantiza orden global y reintenta fallos hasta diez intentos. Un mensaje entrante puede generar también `conversation.updated`; un cambio múltiple de etiquetas puede generar un evento de contacto y uno por etiqueta.
-
-Ejemplo conceptual de verificación en Node.js:
-
-```js
-import crypto from "node:crypto";
-
-function verify(rawBody, timestamp, signature, secret) {
-  const expected = "v1=" + crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}.${rawBody}`)
-    .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signature)
-  );
+```json
+{
+  "channel_id": "456",
+  "to": "+34600000000",
+  "media_type": "document",
+  "media_url": "https://cdn.example.test/file.pdf",
+  "caption": "Documento",
+  "filename": "file.pdf"
 }
 ```
 
-No usar el JSON reserializado para verificar la firma: debe conservarse el cuerpo HTTP original.
+Formato `send-template`:
+
+```json
+{
+  "channel_id": "456",
+  "to": "+34600000000",
+  "template_name": "bienvenida",
+  "template_language": "es",
+  "components": []
+}
+```
+
+Formato `send-interactive`:
+
+```json
+{
+  "channel_id": "456",
+  "to": "+34600000000",
+  "interactive_type": "button",
+  "body": "Elige una opcion",
+  "action": { "buttons": [] }
+}
+```
+
+Todos los envios comprueban que el canal pertenece a la empresa, esta activo
+y anuncia la capacidad solicitada. Media ademas requiere que el proxy seguro
+este habilitado; si esta desactivado responde `503 media_proxy_disabled`.
+`media:upload` no habilita este endpoint.
+
+## 7. Idempotencia y reintentos
+
+Usa `Idempotency-Key` en contactos, notas y operaciones de escritura que lo
+exijan. En un reintento de red repite metodo, ruta, cuerpo y clave exactamente.
+Cambiar el cuerpo con la misma clave produce `409 idempotency_conflict`.
+
+Un `504 delivery_timeout` deja el resultado del proveedor en estado incierto:
+reconcilia antes de enviar de nuevo. Un `502 delivery_rejected` indica una
+peticion que el motor rechazo; `delivery_failed` indica un fallo del motor.
+
+## 8. Webhooks bidireccionales
+
+Registrar un receptor HTTPS con `POST /api/v1/webhooks` y `webhooks:manage`:
+
+```json
+{
+  "url": "https://smartbc.example.test/webhooks/zinto",
+  "event_types": ["contact.updated", "message.created"]
+}
+```
+
+El secreto `whsec_...` se muestra una sola vez. Zinto entrega eventos al menos
+una vez y SmartBC debe deduplicar por `event.id`. La firma es HMAC-SHA256 del
+texto exacto `<timestamp>.<raw_body>`:
+
+```http
+X-Zinto-Event-Id: 550e8400-e29b-41d4-a716-446655440000
+X-Zinto-Timestamp: 1786582800
+X-Zinto-Signature: v1=<hex>
+```
+
+Verifica la firma antes de parsear, rechaza timestamps con mas de cinco minutos
+y responde `2xx` solo despues de persistir el evento. El worker y la allowlist
+de escrituras son configuraciones operativas separadas de los scopes.
 
 ## 9. Errores
 
@@ -292,71 +337,56 @@ No usar el JSON reserializado para verificar la firma: debe conservarse el cuerp
 }
 ```
 
-Automatizar por `error.code`, no por el texto de `message`:
+Automatiza por `error.code`, no por el texto humano:
 
 | HTTP | Tratamiento |
 |---|---|
-| `400` | Corregir validación, cursor o idempotencia |
-| `401` | Revisar clave, expiración y formato Bearer |
-| `403` | Revisar scope, allowlist de IP o apertura del piloto |
+| `400` | Corregir cuerpo, parametros, ID o cursor |
+| `401` | Revisar clave, expiracion y formato Bearer |
+| `403` | Revisar scope, IP y allowlist operativa |
 | `404` | Tratar como recurso no visible para esa empresa |
-| `409` | Resolver conflicto o conservar la misma idempotency key |
-| `422` | El canal no soporta el tipo de envío |
+| `409` | Resolver duplicado/conflicto o reutilizar la misma clave |
+| `422` | El canal o la etapa no admite la operacion |
 | `502` | Distinguir `delivery_rejected` de `delivery_failed` |
-| `504` | Resultado de entrega desconocido; verificar antes de repetir |
-| `500` | Reintentar con backoff y enviar `request_id` a soporte |
+| `503` | Revisar disponibilidad o `media_proxy_disabled` |
+| `504` | Resultado de entrega desconocido; reconciliar antes de repetir |
 
-## 10. Seguridad de SmartBC
+## 10. Limitaciones explicitas del contrato
 
-- Mantener la API key solo en backend.
-- Usar una clave por empresa, ambiente y servicio.
-- Permitir únicamente las IPs de salida estables de SmartBC.
-- Rotar claves y revocar inmediatamente las expuestas.
-- No registrar cuerpos completos de mensajes ni secretos de webhooks.
-- Validar firma y timestamp antes de encolar un webhook.
-- Persistir `event_id`, `request_id`, IDs de Zinto y estado de sincronización.
-- Aplicar backoff y jitter ante `429`, `502`, `504` y errores transitorios.
-- No asumir que el orden de eventos coincide con el orden de creación.
+- Flows solo permite lectura de flows, asignaciones y ejecuciones agregadas.
+- ERP solo permite los siete recursos indicados en esta guia y solo en lectura.
+- No existen escrituras de Flows ni ERP, ni variantes, pagos, contabilidad,
+  movimientos o transferencias de stock.
+- `tasks.assigned_to` es texto libre; no se valida contra un usuario Zinto.
+- Algunos mensajes enviados por el adaptador legacy pueden mostrar un usuario
+  tecnico generico como autor en la interfaz del CRM.
+- El rate limit es local al proceso; no debe tratarse como una cuota global si
+  se despliegan varias replicas.
+- Un webhook se crea, lista y desactiva; no existe rotacion publica del secreto.
+- La habilitacion de escritura y los scopes son controles independientes.
 
-## 11. Prueba de aceptación para el piloto
+## 11. Prueba de aceptacion SmartBC
 
-Usar solamente los números autorizados: España `+34 606806103` y Chile `+56 9 91653343`, dentro de la empresa piloto `bcousinoprop`.
+Usar solamente los numeros autorizados del piloto: España `+34 606806103` y
+Chile `+56 9 91653343`, dentro de `bcousinoprop`.
 
 1. Confirmar `/health`, `/ready` y `/api/v1/me`.
-2. Confirmar scopes efectivos de la clave SmartBC.
-3. Leer un contacto y su historial completo.
-4. Crear o actualizar un contacto con idempotencia.
-5. Crear o localizar una conversación sin duplicarla.
-6. Enviar texto por España y Chile, con canales explícitos.
-7. Recibir una respuesta en cada número y procesar `message.created`.
-8. Crear nota, etiqueta, deal y tarea desde SmartBC.
-9. Cambiar la etapa del deal mediante IDs reales.
-10. Confirmar que cada cambio aparece en Zinto y en SmartBC.
-11. Repetir una petición con la misma clave y comprobar que no duplica.
-12. Intentar consultar un ID de otra empresa y confirmar `404` tenant-safe.
-13. Simular un webhook duplicado y confirmar una sola aplicación en SmartBC.
-14. Revocar la clave y confirmar que las peticiones nuevas reciben `401`.
+2. Confirmar scopes efectivos y canales activos.
+3. Leer contactos, conversaciones y mensajes antiguos con paginacion.
+4. Crear o localizar una conversacion sin duplicarla.
+5. Enviar texto con `channel_id`, `to` y `message`.
+6. Crear nota, etiqueta, deal y tarea con los scopes correspondientes.
+7. Mover el deal usando IDs reales de pipeline y etapa.
+8. Registrar un webhook y verificar firma, deduplicacion y respuesta `2xx`.
+9. Intentar consultar un ID de otra empresa y confirmar `404` tenant-safe.
+10. Repetir una operacion idempotente y confirmar que no duplica.
 
-## 12. Capacidades todavía no publicadas
-
-SmartBC no debe implementar contra supuestos para estas áreas:
-
-- Creación, edición, activación o ejecución de Flows.
-- Escrituras ERP.
-- Variantes y líneas detalladas de ERP.
-- Movimientos, transferencias y ajustes de stock.
-- Pagos y contabilidad.
-- Corrección del usuario técnico genérico que el motor legacy puede mostrar como autor de algunos mensajes enviados por API.
-- Validación fuerte de `assigned_to` en tareas, cuyo campo heredado es texto libre.
-
-Estas capacidades requieren contratos, pruebas de esquema, aislamiento por empresa, pruebas E2E y autorización de despliegue independientes.
-
-## 13. Fuentes de verdad
+## 12. Fuentes de verdad
 
 - Contrato formal: `openapi/openapi.yaml`
-- Autenticación: `docs/AUTHENTICATION.md`
-- Errores: `docs/ERRORS.md`
-- Paginación: `docs/PAGINATION.md`
+- Matriz SmartBC: `docs/SMARTBC-COMPATIBILITY.md`
+- Autenticacion: `docs/AUTHENTICATION.md`
+- Paginacion: `docs/PAGINATION.md`
 - Idempotencia: `docs/IDEMPOTENCY.md`
 - Webhooks: `docs/WEBHOOKS.md`
 - Flows: `docs/api/FLOWS-API-2026-08-13.md`

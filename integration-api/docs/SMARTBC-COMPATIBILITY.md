@@ -1,151 +1,169 @@
 # Contrato de compatibilidad SmartBC
 
-Este documento fija el contrato de Integration API que SmartBC puede consumir
-en la version `0.1.0`. Es una vista operativa de `openapi/openapi.yaml`; no
-habilita escrituras ni cambia el estado del preview.
+Esta matriz refleja las rutas que registra el runtime actual de Integration
+API. No documenta las implementaciones alternativas que no se conectan en
+produccion. La empresa se obtiene de la API key y nunca de `company_id`.
 
-## URL base sin ambiguedad
+## URL base
 
 | Concepto | URL |
-| --- | --- |
-| Raiz externa del servicio | `https://crm.zinto.app/_integration-api` |
-| Base de recursos REST | `https://crm.zinto.app/_integration-api/api/v1` |
+|---|---|
+| Servicio | `https://crm.zinto.app/_integration-api` |
+| Recursos REST | `https://crm.zinto.app/_integration-api/api/v1` |
 | Health | `https://crm.zinto.app/_integration-api/health` |
 | Readiness | `https://crm.zinto.app/_integration-api/ready` |
 
-Las rutas de OpenAPI incluyen `/api/v1`. Por tanto, `servers[0].url` es la raiz
-del servicio, no la base de recursos. No dupliques segmentos como
-`/_integration-api/_integration-api` o `/api/v1/api/v1`, y no uses
-`https://crm.zinto.app/api/v1`: esa ruta pertenece al CRM recuperado, no a este
-servicio.
+No uses `https://crm.zinto.app/api/v1` para este contrato y no dupliques
+`/_integration-api` o `/api/v1` en el cliente.
 
-`examples/node-client.ts` acepta `ZINTO_API_URL` en cualquiera de estas dos
-formas para facilitar configuraciones SmartBC ya existentes:
-
-```text
-https://crm.zinto.app/_integration-api
-https://crm.zinto.app/_integration-api/api/v1
-```
-
-## Headers de llamadas a Zinto
+## Headers
 
 ```http
-Authorization: Bearer pcp_<64 caracteres hexadecimales en minuscula>
+Authorization: Bearer pcp_<64 caracteres hexadecimales>
 Content-Type: application/json
-Idempotency-Key: <identificador unico de la operacion>
+Idempotency-Key: <clave de la operacion cuando corresponda>
 ```
 
-`Authorization` es obligatorio en todos los recursos `/api/v1`. `Content-Type`
-se usa cuando hay cuerpo JSON. `Idempotency-Key` es obligatorio en creacion de
-contactos, creacion de notas y todos los envios de mensajes. Nunca envies
-`company_id`; la empresa procede de la clave.
+`Content-Type` se envia cuando existe cuerpo JSON. Nunca se envia
+`company_id`. Las claves se guardan solo en backend.
 
-## Rutas implementadas y scopes
+## Rutas y scopes
 
 | Metodo | Ruta | Scope exacto |
-| --- | --- | --- |
-| `GET` | `/health` | Publico |
-| `GET` | `/ready` | Publico |
-| `GET` | `/api/v1/me` | Clave valida, sin scope adicional |
+|---|---|---|
+| `GET` | `/health` | Publica |
+| `GET` | `/ready` | Publica |
+| `GET` | `/api/v1/me` | Clave valida |
 | `GET` | `/api/v1/channels` | `channels:read` |
 | `GET` | `/api/v1/contacts` | `contacts:read` |
+| `GET` | `/api/v1/contacts/{id}` | `contacts:read` |
 | `POST` | `/api/v1/contacts` | `contacts:write` |
 | `PATCH` | `/api/v1/contacts/{id}` | `contacts:write` |
 | `DELETE` | `/api/v1/contacts/{id}` | `contacts:write` |
+| `GET` | `/api/v1/contacts/{id}/notes` | `contacts:read` y `notes:read` |
 | `POST` | `/api/v1/contacts/{id}/notes` | `notes:write` |
 | `PATCH` | `/api/v1/notes/{id}` | `notes:write` |
 | `DELETE` | `/api/v1/notes/{id}` | `notes:write` |
 | `PUT` | `/api/v1/contacts/{id}/tags/{tag}` | `tags:write` |
 | `DELETE` | `/api/v1/contacts/{id}/tags/{tag}` | `tags:write` |
 | `GET` | `/api/v1/conversations` | `conversations:read` |
+| `POST` | `/api/v1/conversations` | `conversations:write` |
+| `PATCH` | `/api/v1/conversations/{id}` | `conversations:write` |
 | `GET` | `/api/v1/conversations/{id}/messages` | `conversations:read` y `messages:read` |
+| `GET` | `/api/v1/messages/{id}` | `messages:read` |
 | `POST` | `/api/v1/messages/send` | `messages:send` |
 | `POST` | `/api/v1/messages/send-media` | `messages:send` |
 | `POST` | `/api/v1/messages/send-template` | `messages:send` |
 | `POST` | `/api/v1/messages/send-interactive` | `messages:send` |
+| `GET` | `/api/v1/pipelines` | `pipelines:read` |
+| `GET` | `/api/v1/pipelines/{id}/stages` | `pipelines:read` |
+| `POST` | `/api/v1/pipelines` | `pipelines:write` |
+| `PATCH` | `/api/v1/pipelines/{id}` | `pipelines:write` |
+| `DELETE` | `/api/v1/pipelines/{id}` | `pipelines:write` |
+| `POST` | `/api/v1/pipelines/{id}/stages` | `pipelines:write` |
+| `PATCH` | `/api/v1/pipelines/{id}/stages/{stageId}` | `pipelines:write` |
+| `DELETE` | `/api/v1/pipelines/{id}/stages/{stageId}` | `pipelines:write` |
+| `GET` | `/api/v1/deals` | `deals:read` |
+| `GET` | `/api/v1/deals/{id}` | `deals:read` |
+| `POST` | `/api/v1/deals` | `deals:write` |
+| `PATCH` | `/api/v1/deals/{id}` | `deals:write` |
+| `DELETE` | `/api/v1/deals/{id}` | `deals:write` |
+| `POST` | `/api/v1/deals/{id}/move` | `deals:write` |
+| `PATCH` | `/api/v1/deals/{id}/stage` | `deals:write` |
+| `GET` | `/api/v1/tasks` | `tasks:read` |
+| `POST` | `/api/v1/tasks` | `tasks:write` |
+| `PATCH` | `/api/v1/tasks/{id}` | `tasks:write` |
+| `DELETE` | `/api/v1/tasks/{id}` | `tasks:write` |
+| `GET` | `/api/v1/flows` | `flows:read` |
+| `GET` | `/api/v1/flows/{id}` | `flows:read` |
+| `GET` | `/api/v1/flows/{id}/assignments` | `flows:read` |
+| `GET` | `/api/v1/flow-executions` | `flows:read` |
+| `GET` | `/api/v1/erp/products` | `erp.products:read` |
+| `GET` | `/api/v1/erp/products/{id}` | `erp.products:read` |
+| `GET` | `/api/v1/erp/stock-levels` | `erp.inventory:read` |
+| `GET` | `/api/v1/erp/sales-orders` | `erp.sales-orders:read` |
+| `GET` | `/api/v1/erp/sales-orders/{id}` | `erp.sales-orders:read` |
+| `GET` | `/api/v1/erp/invoices` | `erp.invoices:read` |
+| `GET` | `/api/v1/erp/invoices/{id}` | `erp.invoices:read` |
 | `POST` | `/api/v1/webhooks` | `webhooks:manage` |
 | `GET` | `/api/v1/webhooks` | `webhooks:manage` |
 | `DELETE` | `/api/v1/webhooks/{id}` | `webhooks:manage` |
 
-Las rutas read-only adicionales son `GET /api/v1/pipelines`,
-`GET /api/v1/pipelines/{id}/stages`, `GET /api/v1/deals`,
-`GET /api/v1/deals/{id}`, `GET /api/v1/tasks`, las rutas de Flows y las rutas
-ERP enumeradas en OpenAPI. Sus scopes son, respectivamente, `pipelines:read`,
-`deals:read`, `tasks:read`, `flows:read`, `erp.products:read`,
-`erp.inventory:read`, `erp.sales-orders:read` y `erp.invoices:read`.
-`PATCH /api/v1/deals/{id}/stage` requiere `deals:write`; no hay otras
-escrituras para Pipelines, Deals, Tasks, Flows ni ERP en `0.1.0`. Concede solo
-los scopes que realmente necesita SmartBC y no `*` a una integracion normal.
+El runtime actual no publica `/flows/{id}/sessions`, `/flows/{id}/executions`,
+`/flow-templates`, `/erp/inventory/warehouses`, `/erp/suppliers` ni
+`/erp/purchase-orders`. No deben usarse aunque existan documentos antiguos que
+los mencionen.
 
-## Webhook recibido por SmartBC
+## Cuerpos criticos
 
-Zinto envia un `POST` HTTPS con cuerpo JSON y estos nombres canonicos de header
-(los nombres de headers HTTP no distinguen mayusculas):
-
-```http
-Content-Type: application/json
-X-Zinto-Event-Id: 550e8400-e29b-41d4-a716-446655440000
-X-Zinto-Timestamp: 1786582800
-X-Zinto-Signature: v1=<64 caracteres hexadecimales en minuscula>
-```
+Crear o reutilizar una conversacion:
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "type": "message.created",
-  "schema_version": 1,
-  "occurred_at": "2026-08-13T01:00:00.000Z",
-  "data": {
-    "id": "701",
-    "conversation_id": "88",
-    "direction": "incoming",
-    "type": "text",
-    "content": "Hola",
-    "status": "received",
-    "created_at": "2026-08-13T01:00:00.000Z"
-  }
+  "contact_id": "123",
+  "channel_id": "456"
 }
 ```
 
-La firma es exactamente:
+Enviar texto:
 
-```text
-v1=hex(HMAC_SHA256(webhook_secret, timestamp + "." + raw_http_body))
+```json
+{
+  "channel_id": "456",
+  "to": "+34600000000",
+  "message": "Hola desde SmartBC"
+}
 ```
 
-Usa el secreto `whsec_...` completo, verifica el cuerpo HTTP sin modificar antes
-de parsearlo, comprueba que el ID del header coincide con `body.id`, rechaza
-timestamps fuera de cinco minutos y deduplica por ID. Responde `2xx` solo
-despues de persistir el evento. Zinto reintenta timeouts y respuestas no `2xx`;
-la entrega es al menos una vez y no garantiza orden global.
+Enviar media:
 
-## Eventos de `0.1.0`
+```json
+{
+  "channel_id": "456",
+  "to": "+34600000000",
+  "media_type": "document",
+  "media_url": "https://cdn.example.test/file.pdf",
+  "caption": "Documento",
+  "filename": "file.pdf"
+}
+```
 
-Con la migracion aplicada y worker habilitado, la captura cubre todas las
-familias enumeradas en OpenAPI: CRM, deals, pipelines y etapas, tareas, ERP
-operativo y Flows. Los triggers de familias opcionales se crean solo cuando
-existe su tabla de origen. SmartBC debe enviar uno de los valores completos de
-`WebhookEventType` al crear la suscripcion.
+La ruta de texto no acepta `conversation_id` + `body`. `send-media` puede
+devolver `503 media_proxy_disabled` si el proxy seguro no esta habilitado;
+`media:upload` no forma parte de este contrato.
 
-Un mensaje entrante y uno saliente usan `message.created`; SmartBC debe mirar
-`data.direction` (`incoming` u `outgoing`) en vez de esperar un evento separado
-`message.received`.
+## Paginacion e incremental
 
-Un cambio de etapa emite `deal.stage.changed` en lugar de `deal.updated`, y la
-primera transicion de una tarea a completada emite `task.completed`. Que estas
-familias tengan eventos no implica que dispongan de endpoints CRUD publicos en
-`0.1.0`; SmartBC debe usar solo las rutas incluidas en OpenAPI.
+Las listas responden con `data` y `meta.next_cursor`/`meta.has_more`. `limit`
+va de 1 a 200 y el valor por defecto es 50. El cursor es opaco. Las rutas que
+aceptan `updated_since` lo indican en OpenAPI y en la guia principal; no se
+debe enviar ese parametro a rutas que no lo acepten.
 
-El preview controlado no aplica la migracion ni inicia el worker, por lo que no
-entrega eventos aunque acepte las rutas de lectura. Consulta
-`docs/SMARTBC-READINESS-CHECKLIST.md` antes de esperar webhooks en SmartBC.
+## Webhooks
 
-## Compatibilidad hacia atras
+Crear un endpoint requiere `webhooks:manage` y este cuerpo:
 
-- No se elimina ni renombra ninguna ruta, scope, header o evento aceptado.
-- Los IDs se serializan como strings aunque la base de datos use enteros.
-- Los cursores son opacos; SmartBC solo debe reenviar `meta.next_cursor`.
-- Los campos nuevos en respuestas o `data` de eventos deben tolerarse.
-- Los errores se deciden por `error.code`, no por el texto humano.
-- Un `504 delivery_timeout` es ambiguo: reconcilia historial/webhook antes de
-  decidir si reintentas con una nueva clave de idempotencia.
+```json
+{
+  "url": "https://smartbc.example.test/webhooks/zinto",
+  "event_types": ["message.created", "contact.updated"]
+}
+```
+
+El secreto `whsec_...` solo aparece al crear el endpoint. La firma usa
+`v1=HMAC_SHA256(secret, timestamp + "." + raw_body)`, recibida en
+`X-Zinto-Signature`, con `X-Zinto-Event-Id` y `X-Zinto-Timestamp`. SmartBC debe
+verificar el cuerpo original, rechazar timestamps de mas de cinco minutos,
+persistir antes de responder `2xx` y deduplicar por `event.id`.
+
+## Compatibilidad y limitaciones
+
+- Los IDs se serializan como strings aunque la base use enteros.
+- Un recurso de otra empresa responde como no encontrado (`404` tenant-safe).
+- Los errores deben tratarse por `error.code`, no por el texto humano.
+- `409 contact_already_exists` significa que el telefono ya existe en esa
+  empresa; SmartBC debe localizar y reutilizar el contacto.
+- Flows y ERP son lectura; no hay mutaciones publicas de esos modulos.
+- `tasks.assigned_to` es texto libre y no valida un usuario de la empresa.
+- El motor legacy puede mostrar un autor tecnico generico en mensajes enviados.
+- La allowlist operativa es independiente de los scopes de la API key.
