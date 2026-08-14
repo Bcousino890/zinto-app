@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 import { buildApp } from "../src/app.js";
+import { webhookEventTypes } from "../src/webhooks/event-types.js";
 
 const contractPath = new URL("../openapi/openapi.yaml", import.meta.url);
 
@@ -156,5 +157,57 @@ describe("OpenAPI partner contract", () => {
     expect(document.components.schemas.DecimalString).toEqual(expect.objectContaining({ type: "string" }));
     expect(document.components.schemas.Flow.properties).not.toHaveProperty("nodes");
     expect(document.components.schemas.FlowExecution.properties).not.toHaveProperty("context_data");
+  });
+
+  it("matches the route guards for pipelines, deals, tasks, conversations, and messages", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const expectedScopes: Record<string, string[]> = {
+      "GET /api/v1/pipelines": ["pipelines:read"],
+      "GET /api/v1/pipelines/{id}/stages": ["pipelines:read"],
+      "GET /api/v1/deals": ["deals:read"],
+      "GET /api/v1/deals/{id}": ["deals:read"],
+      "PATCH /api/v1/deals/{id}/stage": ["deals:write"],
+      "GET /api/v1/tasks": ["tasks:read"],
+      "POST /api/v1/conversations": ["conversations:write"],
+      "GET /api/v1/messages/{id}": ["messages:read"]
+    };
+
+    for (const [operation, scopes] of Object.entries(expectedScopes)) {
+      const [method, path] = operation.split(" ") as [string, string];
+      expect(document.paths[path][method.toLowerCase()]["x-required-scopes"], operation)
+        .toEqual(scopes);
+    }
+  });
+
+  it("advertises exactly the events installed by the outbox migration", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const eventType = document.components.schemas.WebhookEventType;
+
+    expect([...eventType.enum].sort()).toEqual([...webhookEventTypes].sort());
+    expect(eventType.description).toContain("installed outbox migration");
+    expect(document.components.schemas.WebhookEvent.properties.schema_version).toEqual({
+      type: "integer",
+      minimum: 1
+    });
+  });
+
+  it("defines the external SmartBC base URL and signed outbound delivery", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const delivery = document.webhooks.eventDelivery.post;
+    const headers = Object.fromEntries(
+      delivery.parameters.map((parameter: { name: string }) => [parameter.name, parameter])
+    );
+
+    expect(document.servers[0].url).toBe("https://crm.zinto.app/_integration-api");
+    expect(document.info["x-api-base-url"]).toBe("https://crm.zinto.app/_integration-api/api/v1");
+    expect(delivery.security).toEqual([]);
+    expect(Object.keys(headers).sort()).toEqual([
+      "X-Zinto-Event-Id",
+      "X-Zinto-Signature",
+      "X-Zinto-Timestamp"
+    ]);
+    expect(headers["X-Zinto-Signature"].schema.pattern).toBe("^v1=[a-f0-9]{64}$");
+    expect(delivery.requestBody.content["application/json"].schema.$ref)
+      .toBe("#/components/schemas/WebhookEvent");
   });
 });

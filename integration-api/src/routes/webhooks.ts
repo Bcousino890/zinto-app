@@ -9,18 +9,10 @@ import { webhookBodyLimitBytes } from "../http/body-limits.js";
 import { ApiError } from "../http/errors.js";
 import type { RateLimiter } from "../http/rate-limit.js";
 import { assertSafeDestination, type HostResolver } from "../net/destination.js";
+import { webhookEventTypes } from "../webhooks/event-types.js";
 import type { WebhookRepository } from "../webhooks/repository.js";
 
-export const webhookEventTypes = [
-  "contact.created", "contact.updated", "contact.deleted",
-  "conversation.created", "conversation.updated",
-  "message.created", "message.status.updated",
-  "note.created", "note.updated", "note.deleted",
-  "tag.attached", "tag.detached",
-  "deal.created", "deal.updated", "deal.stage.changed", "deal.deleted",
-  "task.created", "task.updated", "task.completed", "task.deleted",
-  "channel.connection.updated"
-] as const;
+export { webhookEventTypes } from "../webhooks/event-types.js";
 
 const createSchema = z.object({
   url: z.string().url().max(2048),

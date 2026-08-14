@@ -61,8 +61,10 @@ un contrato publico revisado ni una necesidad minima demostrada para SmartBC.
   DDL no define esas reglas.
 - Reintentar, cancelar o modificar ejecuciones requiere conocer locks, estados
   permitidos y recuperacion del runtime legacy/session. No hay contrato probado.
-- No hay eventos publicos acordados para definition, assignment o execution;
-  publicar una mutacion sin outbox transaccional rompería la bidireccionalidad.
+- La migracion de outbox define eventos versionados de Flow y ejecucion para
+  cambios capturados por el CRM. Eso no define el contrato de una mutacion
+  publica de definitions, assignments o ejecuciones, que seguiria necesitando
+  validacion, idempotencia y semantica de runtime aprobadas.
 
 ### ERP
 
@@ -77,9 +79,9 @@ un contrato publico revisado ni una necesidad minima demostrada para SmartBC.
 - Facturas y pagos requieren numeracion fiscal, impuestos/redondeos, estados,
   asientos, cuentas por cobrar/pagar, reversos y conciliacion. Es inseguro
   aceptar totales calculados por el cliente.
-- No existe un catalogo aprobado de eventos ERP con payload y version. La tabla
-  `erp_flow_event_dispatches` deduplica dispatches internos; no sustituye el
-  outbox publico de una mutacion.
+- La migracion de outbox define eventos ERP versionados para cambios existentes
+  del CRM. No sustituye el contrato transaccional, las reglas contables ni las
+  garantias de una mutacion ERP publica.
 
 ## Contrato minimo antes de escribir
 

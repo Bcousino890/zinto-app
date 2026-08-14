@@ -20,7 +20,10 @@ La version `0.1.0` cubre:
 
 Las escrituras de Flows y ERP no forman parte de `0.1.0`. El contrato listo, las
 exclusiones y el checklist de desbloqueo estan en
-`docs/FLOWS-ERP-SCOPE-CLOSURE.md`; solo OpenAPI determina rutas disponibles.
+`docs/FLOWS-ERP-SCOPE-CLOSURE.md`. Pipelines, oportunidades, tareas, ERP y
+Flows tambien estan incluidos en el modelo de eventos instalado. Las rutas de
+lectura publicadas en OpenAPI son la unica superficie disponible; no existen
+endpoints de escritura para Flows ni ERP en esta version.
 
 ## URL base
 
@@ -35,6 +38,11 @@ Las rutas indicadas en OpenAPI se agregan a esa URL. Por ejemplo:
 ```text
 GET https://crm.zinto.app/_integration-api/api/v1/me
 ```
+
+La base de recursos REST completa es
+`https://crm.zinto.app/_integration-api/api/v1`. Consulta
+`docs/SMARTBC-COMPATIBILITY.md` para evitar duplicar el prefijo al configurar
+clientes que ya guardan `/api/v1` en su URL base.
 
 ## Primera llamada
 
@@ -58,7 +66,7 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
     "api_key": { "id": "12", "name": "Integracion ERP" },
     "scopes": ["contacts:read", "contacts:write"]
   },
-  "meta": { "request_id": "req-123" }
+  "meta": { "request_id": "req_123" }
 }
 ```
 
@@ -75,6 +83,7 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
 ## Contrato y ejemplos
 
 - Contrato machine-readable: `openapi/openapi.yaml`
+- Matriz de compatibilidad SmartBC: `docs/SMARTBC-COMPATIBILITY.md`
 - Autenticacion y permisos: `docs/AUTHENTICATION.md`
 - Paginacion: `docs/PAGINATION.md`
 - Reintentos seguros: `docs/IDEMPOTENCY.md`

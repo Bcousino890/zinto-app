@@ -7,6 +7,7 @@ info:
     Integrate external systems with Zinto contacts, conversations, complete
     message history, channel delivery, notes, tags, and signed webhooks.
     Tenant identity always comes from the API key; clients never send company_id.
+  x-api-base-url: https://crm.zinto.app/_integration-api/api/v1
 servers:
   - url: https://crm.zinto.app/_integration-api
     description: Controlled preview on the Zinto VPS
@@ -29,6 +30,7 @@ paths:
       operationId: getHealth
       security: []
       summary: Check service liveness
+      x-required-scopes: []
       responses:
         "200":
           description: Service is running
@@ -42,6 +44,7 @@ paths:
       operationId: getReadiness
       security: []
       summary: Check service dependencies
+      x-required-scopes: []
       responses:
         "200":
           description: Service and database are ready
@@ -60,6 +63,7 @@ paths:
       tags: [Identity]
       operationId: getApiIdentity
       summary: Inspect the authenticated company and scopes
+      x-required-scopes: []
       responses:
         "200":
           description: Authenticated identity
@@ -74,6 +78,7 @@ paths:
       tags: [Channels]
       operationId: listChannels
       summary: List company channels and supported capabilities
+      x-required-scopes: [channels:read]
       responses:
         "200":
           description: Company channel list without provider credentials
@@ -94,6 +99,7 @@ paths:
       tags: [Contacts]
       operationId: listContacts
       summary: List contacts with cursor pagination
+      x-required-scopes: [contacts:read]
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
@@ -118,6 +124,7 @@ paths:
       tags: [Contacts]
       operationId: createContact
       summary: Create a contact
+      x-required-scopes: [contacts:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -142,6 +149,7 @@ paths:
       tags: [Contacts]
       operationId: updateContact
       summary: Update allowed contact fields
+      x-required-scopes: [contacts:write]
       requestBody:
         required: true
         content:
@@ -161,6 +169,7 @@ paths:
       tags: [Contacts]
       operationId: archiveContact
       summary: Archive a contact
+      x-required-scopes: [contacts:write]
       responses:
         "200":
           description: Contact archived
@@ -178,6 +187,7 @@ paths:
       tags: [Contacts]
       operationId: createContactNote
       summary: Add a historical note to a contact
+      x-required-scopes: [notes:write]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -202,6 +212,7 @@ paths:
       tags: [Contacts]
       operationId: updateContactNote
       summary: Update a note
+      x-required-scopes: [notes:write]
       requestBody:
         required: true
         content:
@@ -221,6 +232,7 @@ paths:
       tags: [Contacts]
       operationId: deleteContactNote
       summary: Delete a note
+      x-required-scopes: [notes:write]
       responses:
         "204": { description: Note deleted }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -238,6 +250,7 @@ paths:
       tags: [Contacts]
       operationId: attachContactTag
       summary: Attach a tag idempotently
+      x-required-scopes: [tags:write]
       responses:
         "200":
           description: Updated contact
@@ -252,6 +265,7 @@ paths:
       tags: [Contacts]
       operationId: detachContactTag
       summary: Detach a tag idempotently
+      x-required-scopes: [tags:write]
       responses:
         "200":
           description: Updated contact
@@ -266,6 +280,7 @@ paths:
     get:
       tags: [Pipelines]
       operationId: listPipelines
+      x-required-scopes: [pipelines:read]
       summary: List the pipelines of the authenticated company
       parameters:
         - $ref: "#/components/parameters/Cursor"
@@ -293,6 +308,7 @@ paths:
     get:
       tags: [Pipelines]
       operationId: listPipelineStages
+      x-required-scopes: [pipelines:read]
       summary: List the stages of a pipeline owned by the company
       parameters:
         - $ref: "#/components/parameters/Cursor"
@@ -319,6 +335,7 @@ paths:
     get:
       tags: [Deals]
       operationId: listDeals
+      x-required-scopes: [deals:read]
       summary: List deals with cursor pagination
       description: >
         stage_key carries the legacy stage vocabulary while stage_id and
@@ -356,6 +373,7 @@ paths:
     get:
       tags: [Deals]
       operationId: getDeal
+      x-required-scopes: [deals:read]
       summary: Fetch a single deal owned by the company
       responses:
         "200":
@@ -378,6 +396,7 @@ paths:
     patch:
       tags: [Deals]
       operationId: changeDealStage
+      x-required-scopes: [deals:write]
       summary: Move a deal to another stage of its own pipeline
       description: >
         Writes stage_id and the legacy stage_key together, exactly as the CRM
@@ -410,6 +429,7 @@ paths:
     get:
       tags: [Tasks]
       operationId: listTasks
+      x-required-scopes: [tasks:read]
       summary: List contact tasks with cursor pagination
       parameters:
         - $ref: "#/components/parameters/Cursor"
@@ -439,6 +459,7 @@ paths:
       tags: [Conversations]
       operationId: listConversations
       summary: List conversations
+      x-required-scopes: [conversations:read]
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
@@ -462,6 +483,7 @@ paths:
     post:
       tags: [Conversations]
       operationId: createConversation
+      x-required-scopes: [conversations:write]
       summary: Find or create the conversation of a contact on a channel
       description: >-
         Returns the existing one-to-one conversation between the contact and the
@@ -502,6 +524,7 @@ paths:
         catches newly created messages, never a later status or read_at
         change on an older one (those already arrive as their own
         message.status.updated webhook event).
+      x-required-scopes: [conversations:read, messages:read]
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
@@ -529,6 +552,7 @@ paths:
     get:
       tags: [Messages]
       operationId: getMessage
+      x-required-scopes: [messages:read]
       summary: Fetch a single message owned by the company
       responses:
         "200":
@@ -548,6 +572,7 @@ paths:
       tags: [Messages]
       operationId: sendTextMessage
       summary: Send text through a selected channel
+      x-required-scopes: [messages:send]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -579,6 +604,7 @@ paths:
         outright rather than forwarding the partner URL unmodified. Errors use
         the codes unsafe_media_url, media_unreachable, media_too_large,
         media_type_mismatch and media_proxy_disabled.
+      x-required-scopes: [messages:send]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -602,6 +628,7 @@ paths:
       tags: [Messages]
       operationId: sendTemplateMessage
       summary: Send an approved WhatsApp template
+      x-required-scopes: [messages:send]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -624,6 +651,7 @@ paths:
       tags: [Messages]
       operationId: sendInteractiveMessage
       summary: Send an interactive WhatsApp message
+      x-required-scopes: [messages:send]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -834,6 +862,7 @@ paths:
       tags: [Webhooks]
       operationId: listWebhooks
       summary: List webhook endpoints without secrets
+      x-required-scopes: [webhooks:manage]
       responses:
         "200":
           description: Webhook endpoint list
@@ -852,6 +881,7 @@ paths:
       tags: [Webhooks]
       operationId: createWebhook
       summary: Register an HTTPS endpoint; secret is returned once
+      x-required-scopes: [webhooks:manage]
       requestBody:
         required: true
         content:
@@ -882,12 +912,64 @@ paths:
       tags: [Webhooks]
       operationId: disableWebhook
       summary: Disable a webhook endpoint
+      x-required-scopes: [webhooks:manage]
       responses:
         "204": { description: Endpoint disabled }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+webhooks:
+  eventDelivery:
+    post:
+      tags: [Webhooks]
+      operationId: receiveZintoWebhook
+      summary: Receive a signed Zinto event
+      description: |
+        Zinto sends this request to each subscribed partner endpoint. Verify
+        X-Zinto-Signature against the exact raw HTTP body before parsing JSON.
+        A 2xx response acknowledges the event; every other outcome is retried.
+      security: []
+      parameters:
+        - name: X-Zinto-Event-Id
+          in: header
+          required: true
+          description: Immutable event identifier used for deduplication
+          schema: { type: string, format: uuid }
+        - name: X-Zinto-Timestamp
+          in: header
+          required: true
+          description: Unix timestamp in seconds included in the signature input
+          schema: { type: string, pattern: '^\d{10}$' }
+        - name: X-Zinto-Signature
+          in: header
+          required: true
+          description: HMAC-SHA256 signature of `<timestamp>.<raw-body>`
+          schema: { type: string, pattern: '^v1=[a-f0-9]{64}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookEvent" }
+            examples:
+              incomingMessage:
+                summary: Incoming customer message
+                value:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  type: message.created
+                  schema_version: 1
+                  occurred_at: "2026-08-13T01:00:00.000Z"
+                  data:
+                    id: "701"
+                    conversation_id: "88"
+                    direction: incoming
+                    type: text
+                    content: Hola
+                    status: received
+                    created_at: "2026-08-13T01:00:00.000Z"
+      responses:
+        "2XX":
+          description: Event persisted and acknowledged by the partner
 components:
   securitySchemes:
     bearerAuth:
@@ -1528,6 +1610,10 @@ components:
         created_at: { type: string, format: date-time }
     WebhookEventType:
       type: string
+      description: |
+        Accepted subscription event emitted by the installed outbox migration.
+        The corresponding source table must exist for optional ERP and Flow
+        families to install their guarded triggers.
       enum:
         - contact.created
         - contact.updated
@@ -1545,17 +1631,57 @@ components:
         - deal.updated
         - deal.stage.changed
         - deal.deleted
+        - pipeline.created
+        - pipeline.updated
+        - pipeline.deleted
+        - pipeline.stage.created
+        - pipeline.stage.updated
+        - pipeline.stage.deleted
         - task.created
         - task.updated
         - task.completed
         - task.deleted
         - channel.connection.updated
+        - erp.product.created
+        - erp.product.updated
+        - erp.product.deleted
+        - erp.stock_level.created
+        - erp.stock_level.updated
+        - erp.stock_level.deleted
+        - erp.stock_movement.created
+        - erp.stock_movement.updated
+        - erp.stock_movement.deleted
+        - erp.stock_transfer.created
+        - erp.stock_transfer.updated
+        - erp.stock_transfer.deleted
+        - erp.sales_order.created
+        - erp.sales_order.updated
+        - erp.sales_order.deleted
+        - erp.supplier.created
+        - erp.supplier.updated
+        - erp.supplier.deleted
+        - erp.purchase_order.created
+        - erp.purchase_order.updated
+        - erp.purchase_order.deleted
+        - erp.invoice.created
+        - erp.invoice.updated
+        - erp.invoice.deleted
+        - erp.invoice_payment.created
+        - erp.invoice_payment.updated
+        - erp.invoice_payment.deleted
+        - flow.created
+        - flow.updated
+        - flow.deleted
+        - flow.execution.started
+        - flow.execution.updated
+        - flow.execution.completed
+        - flow.execution.failed
     WebhookEvent:
       type: object
       required: [id, type, schema_version, occurred_at, data]
       properties:
         id: { type: string, format: uuid }
         type: { $ref: "#/components/schemas/WebhookEventType" }
-        schema_version: { type: integer, const: 1 }
+        schema_version: { type: integer, minimum: 1 }
         occurred_at: { type: string, format: date-time }
         data: {}
