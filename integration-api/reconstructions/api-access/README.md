@@ -12,6 +12,7 @@ CRM activo. El bundle compilado no se modifica.
 - Contrato de almacenamiento independiente del ORM, para conectarlo al
   Sequelize del CRM sin duplicar la autoridad de permisos.
 - Adaptador HTTP independiente de Express/Sequelize en `http-adapter.ts`.
+- Adaptador de persistencia inyectable en `sequelize-store.ts`.
 
 ## Integración pendiente
 
