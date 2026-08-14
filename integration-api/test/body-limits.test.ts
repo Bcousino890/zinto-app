@@ -137,6 +137,19 @@ async function makeWebhooksApp() {
 }
 
 describe("global body limit", () => {
+  it("rejects an empty JSON body with the canonical 400 envelope", async () => {
+    const app = await makeContactsApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/contacts",
+      headers: { ...headers, "content-type": "application/json", "idempotency-key": "empty-json-body" },
+      payload: ""
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("validation_error");
+  });
+
   it("accepts a request body well within the conservative global limit", async () => {
     const app = await makeContactsApp();
     const response = await app.inject({

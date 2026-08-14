@@ -48,6 +48,16 @@ export function registerErrorHandlers(app: FastifyInstance): void {
       });
     }
 
+    if ((error as { code?: string }).code === "FST_ERR_CTP_EMPTY_JSON_BODY") {
+      return reply.status(400).send({
+        error: {
+          code: "validation_error",
+          message: "The request body is invalid",
+          request_id: request.id
+        }
+      });
+    }
+
     request.log.error({ err: error }, "request failed");
     return reply.status(500).send({
       error: {
