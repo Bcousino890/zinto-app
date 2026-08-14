@@ -62,6 +62,17 @@ describe("OpenAPI partner contract", () => {
       "GET /api/v1/conversations/{id}/messages",
       "GET /api/v1/deals",
       "GET /api/v1/deals/{id}",
+      "GET /api/v1/erp/invoices",
+      "GET /api/v1/erp/invoices/{id}",
+      "GET /api/v1/erp/products",
+      "GET /api/v1/erp/products/{id}",
+      "GET /api/v1/erp/sales-orders",
+      "GET /api/v1/erp/sales-orders/{id}",
+      "GET /api/v1/erp/stock-levels",
+      "GET /api/v1/flow-executions",
+      "GET /api/v1/flows",
+      "GET /api/v1/flows/{id}",
+      "GET /api/v1/flows/{id}/assignments",
       "GET /api/v1/me",
       "GET /api/v1/messages/{id}",
       "GET /api/v1/pipelines",
@@ -100,6 +111,7 @@ describe("OpenAPI partner contract", () => {
       conversationMutationRepository: stub, coreRepository: stub,
       deliveryClient: stub, idempotencyRepository: stub, logger: false,
       mediaStore: stub, pipelineMutationRepository: stub, pipelineRepository: stub,
+      erpRepository: stub, flowRepository: stub,
       webhookRepository: stub
     } as never);
     const registered = routesOf(app.printRoutes({ commonPrefix: false }));
@@ -120,5 +132,29 @@ describe("OpenAPI partner contract", () => {
     expect(document.components.parameters.Cursor).toBeDefined();
     expect(document.components.schemas.WebhookEvent).toBeDefined();
     expect(document.components.schemas.ErrorResponse).toBeDefined();
+  });
+
+  it("keeps Flows and ERP read-only with exact scopes and decimal strings", async () => {
+    const document = parse(await readFile(contractPath, "utf8"));
+    const expectedScopes: Record<string, string> = {
+      "/api/v1/flows": "flows:read",
+      "/api/v1/flows/{id}": "flows:read",
+      "/api/v1/flows/{id}/assignments": "flows:read",
+      "/api/v1/flow-executions": "flows:read",
+      "/api/v1/erp/products": "erp.products:read",
+      "/api/v1/erp/products/{id}": "erp.products:read",
+      "/api/v1/erp/stock-levels": "erp.inventory:read",
+      "/api/v1/erp/sales-orders": "erp.sales-orders:read",
+      "/api/v1/erp/sales-orders/{id}": "erp.sales-orders:read",
+      "/api/v1/erp/invoices": "erp.invoices:read",
+      "/api/v1/erp/invoices/{id}": "erp.invoices:read"
+    };
+    for (const [path, scope] of Object.entries(expectedScopes)) {
+      expect(document.paths[path].get["x-required-scopes"]).toEqual([scope]);
+      expect(Object.keys(document.paths[path]).filter((key) => ["post", "patch", "put", "delete"].includes(key))).toEqual([]);
+    }
+    expect(document.components.schemas.DecimalString).toEqual(expect.objectContaining({ type: "string" }));
+    expect(document.components.schemas.Flow.properties).not.toHaveProperty("nodes");
+    expect(document.components.schemas.FlowExecution.properties).not.toHaveProperty("context_data");
   });
 });

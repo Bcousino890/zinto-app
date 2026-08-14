@@ -13,11 +13,14 @@ La version `0.1.0` cubre:
 - contactos, notas y etiquetas;
 - conversaciones e historial completo de mensajes;
 - envio de texto, multimedia, plantillas e interactivos segun el canal;
+- pipelines, oportunidades y tareas;
+- metadatos, asignaciones y ejecuciones de Flows en solo lectura;
+- productos, existencias, pedidos de venta y facturas ERP en solo lectura;
 - webhooks firmados para sincronizacion de cambios.
 
-Pipeline, oportunidades y tareas estan incluidos en el modelo de eventos, pero
-sus endpoints CRUD todavia no forman parte de `0.1.0`. No deben considerarse
-disponibles hasta que aparezcan en `openapi/openapi.yaml`.
+Las escrituras de Flows y ERP no forman parte de `0.1.0`. El contrato listo, las
+exclusiones y el checklist de desbloqueo estan en
+`docs/FLOWS-ERP-SCOPE-CLOSURE.md`; solo OpenAPI determina rutas disponibles.
 
 ## URL base
 
@@ -77,6 +80,6 @@ La respuesta identifica la empresa y los permisos efectivos de la clave:
 - Reintentos seguros: `docs/IDEMPOTENCY.md`
 - Webhooks: `docs/WEBHOOKS.md`
 - Errores: `docs/ERRORS.md`
+- Cierre Flows/ERP: `docs/FLOWS-ERP-SCOPE-CLOSURE.md`
 - Cliente Node.js: `examples/node-client.ts`
 - Receptor de webhooks: `examples/webhook-receiver.ts`
-

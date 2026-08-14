@@ -22,12 +22,16 @@ import { createIpRateLimitHook, defaultRateLimitConfig, RateLimiter } from "./ht
 import type { CoreRepository } from "./resources/core.js";
 import type { PipelineMutationRepository } from "./resources/pipeline-mutations.js";
 import type { PipelineRepository } from "./resources/pipelines.js";
+import type { FlowRepository } from "./resources/flows.js";
+import type { ErpRepository } from "./resources/erp.js";
 import { registerCoreRoutes } from "./routes/core.js";
 import { registerContactMutationRoutes } from "./routes/contact-mutations.js";
 import { registerConversationMutationRoutes } from "./routes/conversation-mutations.js";
 import { registerMeRoute } from "./routes/me.js";
 import { registerPipelineMutationRoutes } from "./routes/pipeline-mutations.js";
 import { registerPipelineRoutes } from "./routes/pipelines.js";
+import { registerFlowRoutes } from "./routes/flows.js";
+import { registerErpRoutes } from "./routes/erp.js";
 import { registerMessageSendRoutes } from "./routes/message-send.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 
@@ -38,6 +42,8 @@ export interface AppOptions {
   coreRepository?: CoreRepository;
   deliveryAuditRepository?: DeliveryAuditRepository;
   deliveryClient?: DeliveryClient;
+  erpRepository?: ErpRepository;
+  flowRepository?: FlowRepository;
   hostResolver?: HostResolver;
   idempotencyRepository?: IdempotencyRepository;
   logger?: FastifyServerOptions["logger"];
@@ -138,6 +144,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
     if (options.pipelineRepository !== undefined) {
       registerPipelineRoutes(app, options.apiKeyRepository, options.pipelineRepository);
+    }
+    if (options.flowRepository !== undefined) {
+      registerFlowRoutes(app, options.apiKeyRepository, options.flowRepository);
+    }
+    if (options.erpRepository !== undefined) {
+      registerErpRoutes(app, options.apiKeyRepository, options.erpRepository);
     }
     if (options.pipelineMutationRepository !== undefined) {
       registerPipelineMutationRoutes(

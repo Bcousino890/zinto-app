@@ -17,6 +17,8 @@ tags:
   - name: Contacts
   - name: Conversations
   - name: Messages
+  - name: Flows
+  - name: ERP
   - name: Webhooks
 security:
   - bearerAuth: []
@@ -639,6 +641,194 @@ paths:
         "422": { $ref: "#/components/responses/UnsupportedCapability" }
         "502": { $ref: "#/components/responses/DeliveryFailed" }
         "504": { $ref: "#/components/responses/DeliveryTimeout" }
+  /api/v1/flows:
+    get:
+      tags: [Flows]
+      operationId: listFlows
+      x-required-scopes: ["flows:read"]
+      summary: List safe flow metadata for the authenticated company
+      description: Flow graph JSON and variables are intentionally not exposed.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+      responses:
+        "200": { $ref: "#/components/responses/FlowPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/flows/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Flows]
+      operationId: getFlow
+      x-required-scopes: ["flows:read"]
+      summary: Fetch safe flow metadata owned by the company
+      responses:
+        "200": { $ref: "#/components/responses/FlowItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/flows/{id}/assignments:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Flows]
+      operationId: listFlowAssignments
+      x-required-scopes: ["flows:read"]
+      summary: List channel assignments whose flow and channel belong to the company
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+      responses:
+        "200": { $ref: "#/components/responses/FlowAssignmentPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/flow-executions:
+    get:
+      tags: [Flows]
+      operationId: listFlowExecutions
+      x-required-scopes: ["flows:read"]
+      summary: List execution lifecycle metadata without runtime payloads
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: flow_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [running, waiting, completed, failed, abandoned, timeout] }
+      responses:
+        "200": { $ref: "#/components/responses/FlowExecutionPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/products:
+    get:
+      tags: [ERP]
+      operationId: listErpProducts
+      x-required-scopes: ["erp.products:read"]
+      summary: List safe product catalog fields
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, draft, archived] }
+      responses:
+        "200": { $ref: "#/components/responses/ProductPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/products/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [ERP]
+      operationId: getErpProduct
+      x-required-scopes: ["erp.products:read"]
+      summary: Fetch a product owned by the company
+      responses:
+        "200": { $ref: "#/components/responses/ProductItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/erp/stock-levels:
+    get:
+      tags: [ERP]
+      operationId: listErpStockLevels
+      x-required-scopes: ["erp.inventory:read"]
+      summary: List stock levels with same-company product and warehouse references
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: product_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+        - name: warehouse_id
+          in: query
+          schema: { type: string, pattern: '^\d+$' }
+      responses:
+        "200": { $ref: "#/components/responses/StockLevelPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/sales-orders:
+    get:
+      tags: [ERP]
+      operationId: listErpSalesOrders
+      x-required-scopes: ["erp.sales-orders:read"]
+      summary: List sales order headers without addresses, notes, or line items
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, quotation, confirmed, processing, shipped, delivered, cancelled, returned] }
+      responses:
+        "200": { $ref: "#/components/responses/SalesOrderPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/sales-orders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [ERP]
+      operationId: getErpSalesOrder
+      x-required-scopes: ["erp.sales-orders:read"]
+      summary: Fetch a sales order header owned by the company
+      responses:
+        "200": { $ref: "#/components/responses/SalesOrderItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/erp/invoices:
+    get:
+      tags: [ERP]
+      operationId: listErpInvoices
+      x-required-scopes: ["erp.invoices:read"]
+      summary: List invoice headers without notes, PDFs, payments, or line items
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/UpdatedSince"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, sent, partially_paid, paid, overdue, cancelled, void] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [sales_invoice, purchase_invoice, credit_note, debit_note] }
+      responses:
+        "200": { $ref: "#/components/responses/InvoicePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/erp/invoices/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [ERP]
+      operationId: getErpInvoice
+      x-required-scopes: ["erp.invoices:read"]
+      summary: Fetch an invoice header owned by the company
+      responses:
+        "200": { $ref: "#/components/responses/InvoiceItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/webhooks:
     get:
       tags: [Webhooks]
@@ -733,6 +923,39 @@ components:
         creation so a page remains stable while records are being updated.
       schema: { type: string, format: date-time }
   responses:
+    FlowPage:
+      description: Tenant-scoped flow metadata page
+      content: { application/json: { schema: { $ref: "#/components/schemas/FlowPageResponse" } } }
+    FlowItem:
+      description: Tenant-scoped flow metadata
+      content: { application/json: { schema: { $ref: "#/components/schemas/FlowResponse" } } }
+    FlowAssignmentPage:
+      description: Tenant-scoped flow assignment page
+      content: { application/json: { schema: { $ref: "#/components/schemas/FlowAssignmentPageResponse" } } }
+    FlowExecutionPage:
+      description: Tenant-scoped flow execution metadata page
+      content: { application/json: { schema: { $ref: "#/components/schemas/FlowExecutionPageResponse" } } }
+    ProductPage:
+      description: Tenant-scoped product page
+      content: { application/json: { schema: { $ref: "#/components/schemas/ProductPageResponse" } } }
+    ProductItem:
+      description: Tenant-scoped product
+      content: { application/json: { schema: { $ref: "#/components/schemas/ProductResponse" } } }
+    StockLevelPage:
+      description: Tenant-scoped stock level page
+      content: { application/json: { schema: { $ref: "#/components/schemas/StockLevelPageResponse" } } }
+    SalesOrderPage:
+      description: Tenant-scoped sales order page
+      content: { application/json: { schema: { $ref: "#/components/schemas/SalesOrderPageResponse" } } }
+    SalesOrderItem:
+      description: Tenant-scoped sales order
+      content: { application/json: { schema: { $ref: "#/components/schemas/SalesOrderResponse" } } }
+    InvoicePage:
+      description: Tenant-scoped invoice page
+      content: { application/json: { schema: { $ref: "#/components/schemas/InvoicePageResponse" } } }
+    InvoiceItem:
+      description: Tenant-scoped invoice
+      content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceResponse" } } }
     ServiceUnavailable:
       description: Operation temporarily disabled by a safety switch
       content:
@@ -794,6 +1017,181 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/MessageDeliveryResponse" }
   schemas:
+    DecimalString:
+      type: string
+      pattern: '^-?\d+(\.\d+)?$'
+      description: Exact base-10 value; serialized as a string to avoid floating-point loss.
+    Flow:
+      type: object
+      required: [id, created_by_user_id, name, status, version, created_at, updated_at]
+      properties:
+        id: { type: string }
+        created_by_user_id: { type: string }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        status: { type: string, enum: [draft, active, inactive, archived] }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowAssignment:
+      type: object
+      required: [id, flow_id, channel_id, active, created_at, updated_at]
+      properties:
+        id: { type: string }
+        flow_id: { type: string }
+        channel_id: { type: string }
+        active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowExecution:
+      type: object
+      required: [id, run_id, flow_id, conversation_id, contact_id, status, trigger_node_id, runtime_type, started_at, last_activity_at, created_at, updated_at]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        flow_id: { type: string }
+        conversation_id: { type: string }
+        contact_id: { type: string }
+        status: { type: string, enum: [running, waiting, completed, failed, abandoned, timeout] }
+        trigger_node_id: { type: string }
+        current_node_id: { type: [string, "null"] }
+        runtime_type: { type: string, enum: [legacy, session] }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        last_activity_at: { type: string, format: date-time }
+        total_duration_ms: { type: [integer, "null"] }
+        completion_rate: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ErpProduct:
+      type: object
+      required: [id, name, type, status, tags, taxable, created_at, updated_at]
+      properties:
+        id: { type: string }
+        category_id: { type: [string, "null"] }
+        sku: { type: [string, "null"] }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        type: { type: string, enum: [physical, service, digital] }
+        unit_price: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        cost_price: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        currency: { type: [string, "null"] }
+        unit_of_measure: { type: [string, "null"] }
+        barcode: { type: [string, "null"] }
+        status: { type: string, enum: [active, inactive, draft, archived] }
+        tags: { type: array, items: { type: string } }
+        taxable: { type: boolean }
+        weight: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    StockLevel:
+      type: object
+      required: [id, product_id, product_name, warehouse_id, warehouse_name, quantity, reserved_quantity, updated_at]
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        product_name: { type: string }
+        product_sku: { type: [string, "null"] }
+        variant_id: { type: [string, "null"] }
+        variant_name: { type: [string, "null"] }
+        warehouse_id: { type: string }
+        warehouse_name: { type: string }
+        quantity: { $ref: "#/components/schemas/DecimalString" }
+        reserved_quantity: { $ref: "#/components/schemas/DecimalString" }
+        reorder_point: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        reorder_quantity: { anyOf: [{ $ref: "#/components/schemas/DecimalString" }, { type: "null" }] }
+        updated_at: { type: string, format: date-time }
+    SalesOrder:
+      type: object
+      required: [id, order_number, status, subtotal, tax_amount, discount_amount, total_amount, source, created_at, updated_at]
+      properties:
+        id: { type: string }
+        order_number: { type: string }
+        contact_id: { type: [string, "null"] }
+        deal_id: { type: [string, "null"] }
+        status: { type: string }
+        subtotal: { $ref: "#/components/schemas/DecimalString" }
+        tax_amount: { $ref: "#/components/schemas/DecimalString" }
+        discount_amount: { $ref: "#/components/schemas/DecimalString" }
+        total_amount: { $ref: "#/components/schemas/DecimalString" }
+        currency: { type: [string, "null"] }
+        assigned_to_user_id: { type: [string, "null"] }
+        valid_until: { type: [string, "null"], format: date-time }
+        source: { type: string }
+        flow_id: { type: [string, "null"] }
+        channel_id: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Invoice:
+      type: object
+      required: [id, invoice_number, type, status, subtotal, tax_amount, discount_amount, total_amount, amount_paid, amount_due, created_at, updated_at]
+      properties:
+        id: { type: string }
+        invoice_number: { type: string }
+        contact_id: { type: [string, "null"] }
+        supplier_id: { type: [string, "null"] }
+        sales_order_id: { type: [string, "null"] }
+        purchase_order_id: { type: [string, "null"] }
+        type: { type: string, enum: [sales_invoice, purchase_invoice, credit_note, debit_note] }
+        status: { type: string, enum: [draft, sent, partially_paid, paid, overdue, cancelled, void] }
+        issue_date: { type: [string, "null"], format: date-time }
+        due_date: { type: [string, "null"], format: date-time }
+        subtotal: { $ref: "#/components/schemas/DecimalString" }
+        tax_amount: { $ref: "#/components/schemas/DecimalString" }
+        discount_amount: { $ref: "#/components/schemas/DecimalString" }
+        total_amount: { $ref: "#/components/schemas/DecimalString" }
+        amount_paid: { $ref: "#/components/schemas/DecimalString" }
+        amount_due: { $ref: "#/components/schemas/DecimalString" }
+        currency: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/Flow" } } }
+    FlowResponse:
+      type: object
+      properties: { data: { $ref: "#/components/schemas/Flow" }, meta: { $ref: "#/components/schemas/RequestMeta" } }
+    FlowAssignmentPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/FlowAssignment" } } }
+    FlowExecutionPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/FlowExecution" } } }
+    ProductPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/ErpProduct" } } }
+    ProductResponse:
+      type: object
+      properties: { data: { $ref: "#/components/schemas/ErpProduct" }, meta: { $ref: "#/components/schemas/RequestMeta" } }
+    StockLevelPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/StockLevel" } } }
+    SalesOrderPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/SalesOrder" } } }
+    SalesOrderResponse:
+      type: object
+      properties: { data: { $ref: "#/components/schemas/SalesOrder" }, meta: { $ref: "#/components/schemas/RequestMeta" } }
+    InvoicePageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties: { data: { type: array, items: { $ref: "#/components/schemas/Invoice" } } }
+    InvoiceResponse:
+      type: object
+      properties: { data: { $ref: "#/components/schemas/Invoice" }, meta: { $ref: "#/components/schemas/RequestMeta" } }
     RequestMeta:
       type: object
       required: [request_id]

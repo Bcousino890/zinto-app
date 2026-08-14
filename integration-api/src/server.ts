@@ -16,6 +16,8 @@ import { PostgresConversationMutationRepository } from "./resources/conversation
 import { PostgresDeliveryAuditRepository } from "./resources/delivery-audit.js";
 import { PostgresPipelineMutationRepository } from "./resources/pipeline-mutations.js";
 import { PostgresPipelineRepository } from "./resources/pipelines.js";
+import { PostgresFlowRepository } from "./resources/flows.js";
+import { PostgresErpRepository } from "./resources/erp.js";
 import { WebhookSecretCipher } from "./webhooks/cipher.js";
 import { PostgresWebhookDeliveryRepository } from "./webhooks/deliveries.js";
 import { PostgresWebhookRepository } from "./webhooks/repository.js";
@@ -46,6 +48,8 @@ async function start(): Promise<void> {
     coreRepository: new PostgresCoreRepository(pool),
     deliveryAuditRepository: new PostgresDeliveryAuditRepository(pool),
     deliveryClient: new LegacyDeliveryClient(config.LEGACY_API_URL, config.LEGACY_DELIVERY_TIMEOUT_MS),
+    erpRepository: new PostgresErpRepository(pool),
+    flowRepository: new PostgresFlowRepository(pool),
     idempotencyRepository: new PostgresIdempotencyRepository(pool),
     logger: secureLoggerOptions(config.LOG_LEVEL),
     mediaProxy: mediaStore === undefined ? undefined : new DownloadingMediaProxy(mediaStore, {
