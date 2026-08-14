@@ -16,15 +16,16 @@ contract.
 
 1. Copy `ApiKey.ts.template` into `backend/src/models/ApiKey.ts`.
 2. Add `ApiKey` to the Sequelize model list in `backend/src/database/index.ts`.
-3. Apply `legacy-migration.sql` only after checking the live schema and taking a
+3. Import and mount `backend/src/routes/apiKeyRoutes.ts` from
+   `backend/src/routes/index.ts`.
+4. Apply `legacy-migration.sql` only after checking the live schema and taking a
    restorable backup.
-4. Adapt `legacy-express-wiring.ts` to the recovered Express router and mount
-   the catalog and create handlers below the existing session middleware.
-5. Add the frontend selector from `api-access-module/frontend` to the Access
+5. Adapt `legacy-express-wiring.ts` if the source uses a different session shape.
+6. Add the frontend selector from `api-access-module/frontend` to the Access
    API settings page. Send either `{ profile }` or `{ permissions }`, never both.
-6. Enforce the resolved permissions again in the API-key authentication
+7. Enforce the resolved permissions again in the API-key authentication
    middleware. The UI is convenience only and is not a security boundary.
-7. Run backend build, frontend build, unit tests, tenant-isolation tests, and a
+8. Run backend build, frontend build, unit tests, tenant-isolation tests, and a
    staging smoke test before any production deployment.
 
 For a fresh recovered source tree, run

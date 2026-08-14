@@ -1,0 +1,73 @@
+import { createHash, randomBytes } from "crypto";
+import { Router, Request, Response } from "express";
+
+import isAuth from "../middleware/isAuth";
+import ApiKey from "../models/ApiKey";
+
+const router = Router();
+
+const PERMISSIONS = [
+  "contacts:read", "contacts:write", "conversations:read", "conversations:write",
+  "messages:read", "messages:send", "notes:read", "notes:write", "tags:read",
+  "tags:write", "channels:read", "pipelines:read", "pipelines:write", "deals:read",
+  "deals:write", "tasks:read", "tasks:write", "webhooks:manage"
+] as const;
+
+const PROFILES: Record<string, readonly string[]> = {
+  readonly: ["contacts:read", "conversations:read", "messages:read", "channels:read"],
+  messaging: ["contacts:read", "conversations:read", "messages:read", "messages:send", "channels:read"],
+  crm: PERMISSIONS
+};
+
+function admin(req: Request): boolean {
+  const profile = String(req.user?.profile || "").toLowerCase();
+  return ["admin", "superadmin", "super"].includes(profile);
+}
+
+function permissions(body: unknown): string[] {
+  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  if (typeof input.profile === "string" && input.permissions !== undefined) {
+    throw new Error("profile_and_permissions_are_mutually_exclusive");
+  }
+  const selected = input.profile !== undefined
+    ? PROFILES[String(input.profile)]
+    : input.permissions;
+  if (!Array.isArray(selected) || selected.length === 0 || selected.some((p) => typeof p !== "string")) {
+    throw new Error("permissions_required");
+  }
+  const unique = [...new Set(selected)];
+  if (unique.some((p) => !(PERMISSIONS as readonly string[]).includes(p))) {
+    throw new Error("unknown_permission");
+  }
+  return unique;
+}
+
+router.get("/api/settings/api-keys/catalog", isAuth, (req: Request, res: Response) => {
+  if (!admin(req)) return res.status(403).json({ error: "admin_required" });
+  return res.json({ scopes: PERMISSIONS, profiles: Object.keys(PROFILES) });
+});
+
+router.post("/api/settings/api-keys", isAuth, async (req: Request, res: Response) => {
+  if (!admin(req)) return res.status(403).json({ error: "admin_required" });
+  try {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    if (!name || name.length > 80) return res.status(400).json({ error: "invalid_name" });
+    const secret = `pcp_${randomBytes(32).toString("base64url")}`;
+    const row = await ApiKey.create({
+      companyId: req.user.companyId,
+      userId: Number(req.user.id),
+      name,
+      keyHash: createHash("sha256").update(secret).digest("hex"),
+      keyPrefix: secret.slice(0, 12),
+      permissions: permissions(req.body),
+      metadata: { api_access_version: 1 },
+      isActive: true
+    });
+    return res.status(201).json({ data: { id: row.id, name: row.name, keyPrefix: row.keyPrefix, permissions: row.permissions, key: secret } });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "invalid_request";
+    return res.status(400).json({ error: code });
+  }
+});
+
+export default router;
