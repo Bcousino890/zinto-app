@@ -11,6 +11,7 @@ CRM activo. El bundle compilado no se modifica.
 - Hash SHA-256 y prefijo público para persistencia segura.
 - Contrato de almacenamiento independiente del ORM, para conectarlo al
   Sequelize del CRM sin duplicar la autoridad de permisos.
+- Adaptador HTTP independiente de Express/Sequelize en `http-adapter.ts`.
 
 ## Integración pendiente
 
@@ -19,6 +20,10 @@ El adaptador debe conectarse a las rutas Express del CRM recuperado:
 - `GET /api/settings/api-keys/catalog`
 - `POST /api/settings/api-keys`
 - `PATCH /api/settings/api-keys/:id`
+
+El adaptador ya implementa el catálogo y `POST`; la capa Sequelize del CRM
+debe implementar `ApiKeyStore.create` sobre la tabla `api_keys` y registrar
+las rutas con la sesión administrativa existente.
 
 La allowlist operativa de escrituras continúa separada de los scopes. Este
 módulo no activa escrituras por sí solo.
