@@ -1,0 +1,8 @@
+snapshot_date=2026-08-25
+container=/powerchat-app-bcousinoprop
+image_tag=bcousinoprop-app-bcousinoprop
+image_id=sha256:00772ae4b3d6b42b2519cbcae6f8082da493ecabc4d3a67b24d526d5f5e6b120
+container_created=2026-08-24T21:53:32.356885125Z
+container_started=2026-08-24T21:53:45.341591678Z
+image_created=2026-08-24T18:53:04.486591045-03:00
+source=VPS production container, read-only extraction

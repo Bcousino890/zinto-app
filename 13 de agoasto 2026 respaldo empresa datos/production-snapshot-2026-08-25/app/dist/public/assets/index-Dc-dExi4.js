@@ -1,0 +1,1 @@
+import{aS as s,u as a,r as n,j as r,dq as d}from"./index-Zhw85uaR.js";function e(){const{user:e,isLoading:i}=s(),[u,o]=a();return n.useEffect(()=>{i||(e&&e.isSuperAdmin?o("/admin/dashboard"):e&&o("/"))},[e,i,o]),i||!e?r.jsx(d,{}):null}export{e as default};

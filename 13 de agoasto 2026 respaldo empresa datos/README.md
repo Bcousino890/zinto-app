@@ -17,6 +17,13 @@ propietario en:
 
 No se debe subir esa clave al repositorio ni compartirla por correo o chat.
 
+## Actualización de producción
+
+La instantánea pública de artefactos compilados tomada el 25 de agosto de
+2026 está en `production-snapshot-2026-08-25/`. No contiene secretos, datos de
+usuarios, uploads ni sesiones activas; esos elementos siguen únicamente en el
+respaldo cifrado privado.
+
 ## Verificar
 
 ```bash
